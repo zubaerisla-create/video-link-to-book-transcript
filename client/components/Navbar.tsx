@@ -121,13 +121,13 @@ export function Navbar() {
         </div>
 
         {/* Mobile Hamburger Button */}
-        <div className="flex items-center gap-2 md:hidden">
+        <div className="flex items-center gap-2 md:hidden shrink-0">
           <a
             href={githubUrl}
             target="_blank"
             rel="noopener noreferrer"
             aria-label="GitHub Repository"
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-[#77716D] hover:text-[#292522] hover:bg-[#F0E8E2]/50 transition-colors"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[#77716D] hover:text-[#292522] hover:bg-[#F0E8E2]/50 transition-colors"
           >
             <GithubIcon className="h-4 w-4" />
           </a>
@@ -135,7 +135,7 @@ export function Navbar() {
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle navigation menu"
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#F0E8E2] bg-white text-[#292522] shadow-xs hover:bg-[#FFFDF8] transition-colors"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#F0E8E2] bg-white text-[#292522] shadow-xs hover:bg-[#FFFDF8] transition-colors"
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>

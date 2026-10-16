@@ -472,8 +472,8 @@ function HomePageContent() {
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 sm:py-12">
       {/* Hero Section */}
       <div className="text-center mb-8 sm:mb-10">
-        <div className="inline-flex items-center rounded-full bg-[#FFF1B8] px-3.5 py-1 text-xs font-semibold tracking-wider text-[#292522] uppercase mb-4 border border-[#F0E8E2]">
-          <span>Multilingual YouTube Transcript Extractor</span>
+        <div className="inline-flex items-center max-w-full text-center rounded-full bg-[#FFF1B8] px-3.5 py-1 text-[11px] sm:text-xs font-semibold tracking-wider text-[#292522] uppercase mb-4 border border-[#F0E8E2]">
+          <span className="truncate">Multilingual YouTube Transcript Extractor</span>
         </div>
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-[#292522]">
           Turn YouTube videos into text.
