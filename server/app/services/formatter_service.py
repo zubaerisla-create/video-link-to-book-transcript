@@ -22,11 +22,17 @@ def clean_text(raw_text: str) -> str:
     return text.strip()
 
 
-def remove_overlapping_words(prev_text: str, curr_text: str) -> str:
+def remove_overlapping_words(prev_text: str, curr_text: str, time_overlap: bool = False) -> str:
     """
     Detects if the end of prev_text overlaps with the beginning of curr_text
     (common in rolling auto-generated captions).
-    If an overlap of 1 to 6 words is found, returns curr_text with the overlap stripped.
+    If an overlap of 1 to 6 words is found:
+    - If curr_text has additional non-overlapping words (e.g. rolling words),
+      returns curr_text with the overlap stripped.
+    - If the entire curr_text matches the tail of prev_text, it is only stripped if
+      time_overlap is True (i.e. rolling caption window). If time_overlap is False
+      (the previous caption finished before the current one began), the repeated phrase
+      is preserved as legitimate spoken speech.
     """
     prev_words = prev_text.split()
     curr_words = curr_text.split()
@@ -39,6 +45,8 @@ def remove_overlapping_words(prev_text: str, curr_text: str) -> str:
         prev_tail = [w.lower().strip(".,!?:;\"'()[]{}|।؟۔") for w in prev_words[-n:]]
         curr_head = [w.lower().strip(".,!?:;\"'()[]{}|।؟۔") for w in curr_words[:n]]
         if prev_tail == curr_head and len(prev_tail) > 0 and all(len(w) > 0 for w in prev_tail):
+            if n == len(curr_words) and not time_overlap:
+                return curr_text
             return " ".join(curr_words[n:])
 
     return curr_text
@@ -112,8 +120,9 @@ def format_transcript_paragraphs(
         if not text:
             continue
 
-        # Check for rolling subtitle duplication
-        deduped_text = remove_overlapping_words(prev_raw_cleaned, text)
+        # Check for rolling subtitle duplication (subtitles overlapping in time)
+        time_overlap = (last_end_time > 0 and start < (last_end_time - 0.2))
+        deduped_text = remove_overlapping_words(prev_raw_cleaned, text, time_overlap=time_overlap)
         if not deduped_text.strip():
             # Whole segment was duplicate
             continue

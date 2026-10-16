@@ -45,6 +45,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let currentHost = "https://habd.tech";
   let activeTabInfo = null;
   let extractedTranscriptData = null;
+  let isScanning = false;
 
   // 1. Load Host Settings
   const stored = await chrome.storage.sync.get(["transcriptlyHost"]);
@@ -109,6 +110,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 3. Scan Active YouTube Tab
   async function scanActiveTab() {
+    if (isScanning) {
+      console.log("[Transcriptly popup.js] Scan already in progress, ignoring duplicate call.");
+      return;
+    }
+    isScanning = true;
+    btnRescan.disabled = true;
+    btnOpenPanel.disabled = true;
+
     hideError();
     scanningCard.classList.remove("hidden");
     notYouTubeCard.classList.add("hidden");
@@ -120,6 +129,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!tab || !tab.url || !tab.url.includes("youtube.com/watch")) {
         scanningCard.classList.add("hidden");
         notYouTubeCard.classList.remove("hidden");
+        isScanning = false;
+        btnRescan.disabled = false;
+        btnOpenPanel.disabled = false;
         return;
       }
 
@@ -138,12 +150,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Request transcript extraction from content script
       chrome.tabs.sendMessage(tab.id, { action: "EXTRACT_TRANSCRIPT" }, (response) => {
         scanningCard.classList.add("hidden");
+        isScanning = false;
+        btnRescan.disabled = false;
+        btnOpenPanel.disabled = false;
 
         if (chrome.runtime.lastError || !response) {
-          // If message failed to respond, show panel closed card
+          console.log("[Transcriptly popup.js] Extraction response was empty or error:", chrome.runtime.lastError?.message);
           panelClosedCard.classList.remove("hidden");
           return;
         }
+
+        console.log(
+          `[Transcriptly popup.js] Received scan response: found=${Boolean(response.found)}, ` +
+          `segments=${response.segments?.length || 0}, sourceRows=${response.sourceRowCount || 0}, callId=${response.extractionCallCount || 0}`
+        );
 
         extractedTranscriptData = response;
 
@@ -158,6 +178,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       });
     } catch (err) {
+      isScanning = false;
+      btnRescan.disabled = false;
+      btnOpenPanel.disabled = false;
       scanningCard.classList.add("hidden");
       showError("Could not inspect current browser tab: " + err.message);
     }
@@ -179,7 +202,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const hasBangla = /[\u0980-\u09FF]/.test(sample);
     badgeLang.textContent = hasBangla ? "Bangla" : "Original";
 
-    // Snippet
+    // Snippet preview: shows up to 4 preview rows
     const snippetLines = data.segments.slice(0, 4).map((s) => {
       const m = Math.floor(s.start / 60);
       const sec = Math.floor(s.start % 60);
@@ -187,22 +210,30 @@ document.addEventListener("DOMContentLoaded", async () => {
       return `[${ts}] ${s.text}`;
     });
     previewSnippet.textContent = snippetLines.join("\n") + (segmentCount > 4 ? "\n..." : "");
+
+    console.log(
+      `[Transcriptly popup.js] Rendered preview: segments=${segmentCount}, words=${wordCount}, snippetRows=${snippetLines.length}`
+    );
   }
 
   // Open Transcript Panel trigger
   btnOpenPanel.addEventListener("click", async () => {
-    if (!activeTabInfo) return;
+    if (!activeTabInfo || isScanning) return;
+    btnOpenPanel.disabled = true;
     btnOpenPanel.textContent = "Attempting to open...";
     chrome.tabs.sendMessage(activeTabInfo.id, { action: "OPEN_TRANSCRIPT_PANEL" }, (response) => {
       setTimeout(() => {
         btnOpenPanel.textContent = "Try Open YouTube Transcript";
+        btnOpenPanel.disabled = false;
         scanActiveTab();
       }, 1500);
     });
   });
 
   btnRescan.addEventListener("click", () => {
-    scanActiveTab();
+    if (!isScanning) {
+      scanActiveTab();
+    }
   });
 
   // 4. Import from YouTube Capture

@@ -246,3 +246,166 @@ async def test_staging_service_ttl_purge():
     # Immediate retrieval should be None because TTL is 0
     retrieved = await short_ttl_service.get_and_consume(token)
     assert retrieved is None
+
+
+def test_extension_extraction_avoids_dom_duplication():
+    """Verify that targeting ytd-transcript-segment-renderer extracts each row once,
+    while the old overlapping selector caused duplicate extraction on YouTube Polymer DOM."""
+    from bs4 import BeautifulSoup
+
+    youtube_polymer_dom = """
+    <ytd-engagement-panel-section-list-renderer target-id="engagement-panel-transcript" visibility="ENGAGEMENT_PANEL_VISIBILITY_EXPANDED">
+      <div id="segments-container">
+        <!-- Row 1: YouTube Polymer wraps content in custom element with scoped child classes -->
+        <ytd-transcript-segment-renderer class="style-scope ytd-transcript-segment-list-renderer">
+          <div id="segment" class="style-scope ytd-transcript-segment-renderer">
+            <div class="segment-timestamp style-scope ytd-transcript-segment-renderer">0:00</div>
+            <yt-formatted-string class="segment-text style-scope ytd-transcript-segment-renderer">Welcome to this lecture.</yt-formatted-string>
+          </div>
+        </ytd-transcript-segment-renderer>
+
+        <!-- Row 2 -->
+        <ytd-transcript-segment-renderer class="style-scope ytd-transcript-segment-list-renderer">
+          <div id="segment" class="style-scope ytd-transcript-segment-renderer">
+            <div class="segment-timestamp style-scope ytd-transcript-segment-renderer">0:05</div>
+            <yt-formatted-string class="segment-text style-scope ytd-transcript-segment-renderer">Today we will discuss algorithms.</yt-formatted-string>
+          </div>
+        </ytd-transcript-segment-renderer>
+      </div>
+    </ytd-engagement-panel-section-list-renderer>
+    """
+    soup = BeautifulSoup(youtube_polymer_dom, "html.parser")
+
+    # The buggy selector:
+    buggy_matches = soup.select("ytd-transcript-segment-renderer, .ytd-transcript-segment-renderer")
+    assert len(buggy_matches) == 8  # 2 parent elements + 6 child elements carrying the class
+
+    # Buggy extraction collected the text twice for each row:
+    buggy_texts = []
+    for node in buggy_matches:
+        text_el = node.select_one(".segment-text")
+        if text_el and text_el.get_text().strip():
+            buggy_texts.append(text_el.get_text().strip())
+    assert len(buggy_texts) == 4  # 2 rows x 2 = 4 duplicate sentences!
+    assert buggy_texts[0] == buggy_texts[1] == "Welcome to this lecture."
+    assert buggy_texts[2] == buggy_texts[3] == "Today we will discuss algorithms."
+
+    # The fixed selector:
+    fixed_matches = soup.select("ytd-transcript-segment-renderer")
+    assert len(fixed_matches) == 2  # Exactly 2 source rows!
+
+    fixed_texts = []
+    for node in fixed_matches:
+        text_el = node.select_one(".segment-text")
+        if text_el and text_el.get_text().strip():
+            fixed_texts.append(text_el.get_text().strip())
+    assert len(fixed_texts) == 2
+    assert fixed_texts == ["Welcome to this lecture.", "Today we will discuss algorithms."]
+
+
+def test_extension_extraction_preserves_legitimate_repeated_phrases():
+    """Verify that multiple source transcript rows with identical text (legitimate repetitions)
+    are preserved as distinct segments with accurate timestamps, not blindly de-duplicated."""
+    from bs4 import BeautifulSoup
+
+    youtube_repeated_speech_dom = """
+    <div id="segments-container">
+      <ytd-transcript-segment-renderer>
+        <div id="segment">
+          <div class="segment-timestamp">1:10</div>
+          <yt-formatted-string class="segment-text">Never give up.</yt-formatted-string>
+        </div>
+      </ytd-transcript-segment-renderer>
+      <ytd-transcript-segment-renderer>
+        <div id="segment">
+          <div class="segment-timestamp">1:14</div>
+          <yt-formatted-string class="segment-text">Never give up.</yt-formatted-string>
+        </div>
+      </ytd-transcript-segment-renderer>
+      <ytd-transcript-segment-renderer>
+        <div id="segment">
+          <div class="segment-timestamp">1:18</div>
+          <yt-formatted-string class="segment-text">Always keep pushing forward.</yt-formatted-string>
+        </div>
+      </ytd-transcript-segment-renderer>
+    </div>
+    """
+    soup = BeautifulSoup(youtube_repeated_speech_dom, "html.parser")
+    rows = soup.select("ytd-transcript-segment-renderer")
+    assert len(rows) == 3
+
+    extracted = []
+    for row in rows:
+        ts = row.select_one(".segment-timestamp").get_text().strip()
+        text = row.select_one(".segment-text").get_text().strip()
+        extracted.append({"ts": ts, "text": text})
+
+    # Legitimate repetition is preserved with separate timestamps
+    assert len(extracted) == 3
+    assert extracted[0] == {"ts": "1:10", "text": "Never give up."}
+    assert extracted[1] == {"ts": "1:14", "text": "Never give up."}
+    assert extracted[2] == {"ts": "1:18", "text": "Always keep pushing forward."}
+
+
+def test_extension_fallback_containment_filtering():
+    """Verify that if YouTube uses nested divs with classes instead of custom tags,
+    the hierarchical filter keeps only top-level candidates and eliminates parent/child duplicates."""
+    from bs4 import BeautifulSoup
+
+    fallback_dom = """
+    <div id="segments-container">
+      <div class="ytd-transcript-segment-renderer outer-card">
+        <div class="ytd-transcript-segment-renderer inner-card">
+          <div class="segment-timestamp">0:00</div>
+          <div class="segment-text">Testing fallback layout.</div>
+        </div>
+      </div>
+      <div class="ytd-transcript-segment-renderer outer-card">
+        <div class="ytd-transcript-segment-renderer inner-card">
+          <div class="segment-timestamp">0:04</div>
+          <div class="segment-text">Second fallback segment.</div>
+        </div>
+      </div>
+    </div>
+    """
+    soup = BeautifulSoup(fallback_dom, "html.parser")
+    candidates = soup.select(".ytd-transcript-segment-renderer")
+    assert len(candidates) == 4  # 2 outer + 2 inner
+
+    # Hierarchical containment filter:
+    top_level = [
+        c for c in candidates
+        if not any(other != c and c in other.descendants for other in candidates)
+    ]
+    assert len(top_level) == 2  # Exactly 2 top-level rows!
+
+
+def test_stage_import_with_repeated_phrases():
+    """Verify that the staging endpoint preserves legitimate spoken repetitions in videos."""
+    payload = {
+        "video_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "title": "Song with Repeated Chorus",
+        "segments": [
+            {"start": 10.0, "text": "Don't stop believin'", "duration": 3.0},
+            {"start": 14.0, "text": "Don't stop believin'", "duration": 3.0},
+            {"start": 18.0, "text": "Hold on to that feelin'", "duration": 3.0},
+        ],
+        "paragraph_length": "short",
+    }
+    res = client.post("/api/transcript/stage-import", json=payload)
+    assert res.status_code == 201
+    data = res.json()
+    assert data["segment_count"] == 3
+
+    # Retrieve staged transcript
+    token = data["import_token"]
+    res_get = client.get(f"/api/transcript/staged/{token}")
+    assert res_get.status_code == 200
+    staged = res_get.json()
+    assert len(staged["segments"]) == 3
+    # Both repetitions must be present in the segments array
+    assert staged["segments"][0]["text"] == "Don't stop believin'"
+    assert staged["segments"][1]["text"] == "Don't stop believin'"
+    # Paragraph text must also retain the full transcript
+    full_text = " ".join(staged["paragraphs"])
+    assert full_text.count("Don't stop believin'") == 2

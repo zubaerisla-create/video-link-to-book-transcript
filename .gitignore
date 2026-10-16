@@ -30,4 +30,6 @@ huggingface/
 *.sqlite
 *.sqlite3
 data/
+backups/
+scripts/
 

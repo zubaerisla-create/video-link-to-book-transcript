@@ -284,158 +284,217 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
     <div className={`min-h-screen ${themeStyles.pageBg} transition-colors duration-200 pb-20`}>
       {/* Top Reader Sticky Toolbar */}
       <header className={`sticky top-0 z-30 border-b ${themeStyles.border} ${themeStyles.cardBg}/95 backdrop-blur-md transition-colors`}>
-        <div className="mx-auto max-w-4xl flex items-center justify-between px-4 py-2.5 sm:px-6">
-          {/* Left: Back & Title info */}
-          <div className="flex items-center gap-3 min-w-0">
-            <Link
-              href="/dashboard"
-              title="Return to Library"
-              className={`flex items-center gap-1 rounded-xl border ${themeStyles.border} ${themeStyles.buttonBg} p-2 text-xs font-medium ${themeStyles.text} transition-colors shrink-0`}
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Library</span>
-            </Link>
+        <div className="mx-auto max-w-4xl px-3 py-2 sm:px-6 sm:py-2.5">
+          {/* Main Top Row */}
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            {/* Left: Back & Title info */}
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+              <Link
+                href="/dashboard"
+                title="Return to Library"
+                className={`flex items-center gap-1 rounded-xl border ${themeStyles.border} ${themeStyles.buttonBg} p-1.5 sm:p-2 text-xs font-medium ${themeStyles.text} transition-colors shrink-0`}
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Library</span>
+              </Link>
 
-            <div className="min-w-0">
-              <h1 className={`text-xs sm:text-sm font-bold ${themeStyles.text} truncate`}>
-                {book.title}
-              </h1>
-              <div className="flex items-center gap-2 text-[10px] text-[#77716D]">
-                <span>{book.language_name}</span>
-                <span>•</span>
-                <span>{book.word_count.toLocaleString()} words</span>
+              <div className="min-w-0 flex-1">
+                <h1 className={`text-xs sm:text-sm font-bold ${themeStyles.text} truncate`}>
+                  {book.title}
+                </h1>
+                <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] text-[#77716D]">
+                  <span className="truncate max-w-[90px] sm:max-w-none">{book.language_name}</span>
+                  <span>•</span>
+                  <span>{book.word_count.toLocaleString()} words</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Controls & Actions */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {/* Search Input Toggle (Desktop only) */}
+              <div className="relative hidden md:block">
+                <Search className={`pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 ${themeStyles.mutedText}`} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Find in book..."
+                  className={`rounded-xl border ${themeStyles.border} ${themeStyles.pageBg} py-1.5 pl-8 pr-6 text-xs ${themeStyles.text} focus:outline-none focus:ring-1 focus:ring-[#E9A9C3] w-36`}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-[#77716D]"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Mode Toggle: Page by Page vs Continuous */}
+              <button
+                type="button"
+                onClick={() => setIsContinuous(!isContinuous)}
+                title={isContinuous ? "Switch to Page-by-Page Reading" : "Switch to Continuous Scrolling"}
+                className={`flex items-center gap-1 rounded-xl border ${themeStyles.border} ${themeStyles.buttonBg} p-1.5 sm:p-2 text-xs font-medium ${themeStyles.text} transition-colors`}
+              >
+                <Scroll className="h-3.5 w-3.5" />
+                <span className="hidden lg:inline">{isContinuous ? "Continuous" : "Paged"}</span>
+              </button>
+
+              {/* Desktop Font Size Selector (Hidden on mobile < sm) */}
+              <div className={`hidden sm:flex items-center rounded-xl border ${themeStyles.border} ${themeStyles.pageBg} p-0.5`}>
+                {(["sm", "md", "lg", "xl"] as FontSize[]).map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => setFontSize(size)}
+                    className={`rounded-lg px-2 py-1 text-xs font-medium uppercase transition-colors ${
+                      fontSize === size ? themeStyles.activePill : themeStyles.mutedText
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+
+              {/* Desktop Reading Theme Selector (Hidden on mobile < sm) */}
+              <div className={`hidden sm:flex items-center rounded-xl border ${themeStyles.border} ${themeStyles.pageBg} p-0.5`}>
+                <button
+                  type="button"
+                  onClick={() => setTheme("light")}
+                  title="Light Theme"
+                  className={`rounded-lg p-1.5 transition-colors ${theme === "light" ? themeStyles.activePill : themeStyles.mutedText}`}
+                >
+                  <Sun className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTheme("sepia")}
+                  title="Sepia Theme"
+                  className={`rounded-lg p-1.5 transition-colors ${theme === "sepia" ? themeStyles.activePill : themeStyles.mutedText}`}
+                >
+                  <Coffee className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTheme("dark")}
+                  title="Dark Theme"
+                  className={`rounded-lg p-1.5 transition-colors ${theme === "dark" ? themeStyles.activePill : themeStyles.mutedText}`}
+                >
+                  <Moon className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              {/* Export Menu Dropdown */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  className={`flex items-center gap-1 rounded-xl border ${themeStyles.border} ${themeStyles.buttonBg} p-1.5 sm:p-2 text-xs font-medium ${themeStyles.text} transition-colors`}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Export</span>
+                </button>
+
+                {showExportMenu && (
+                  <div className={`absolute right-0 mt-2 w-44 rounded-2xl border ${themeStyles.border} ${themeStyles.cardBg} p-2 shadow-xl z-50`}>
+                    <a
+                      href={getBookPdfUrl(book.id)}
+                      download
+                      onClick={() => setShowExportMenu(false)}
+                      className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium ${themeStyles.text} hover:bg-[#F8DDE8]/40 transition-colors`}
+                    >
+                      <FileDown className="h-4 w-4 text-[#E9A9C3]" />
+                      <span>Download PDF</span>
+                    </a>
+                    <a
+                      href={getBookExportUrl(book.id, "txt")}
+                      download
+                      onClick={() => setShowExportMenu(false)}
+                      className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium ${themeStyles.text} hover:bg-[#F8DDE8]/40 transition-colors`}
+                    >
+                      <FileText className="h-4 w-4" />
+                      <span>Plain Text (TXT)</span>
+                    </a>
+                    <a
+                      href={getBookExportUrl(book.id, "srt")}
+                      download
+                      onClick={() => setShowExportMenu(false)}
+                      className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium ${themeStyles.text} hover:bg-[#F8DDE8]/40 transition-colors`}
+                    >
+                      <FileText className="h-4 w-4" />
+                      <span>Subtitles (SRT)</span>
+                    </a>
+                    <a
+                      href={getBookExportUrl(book.id, "json")}
+                      download
+                      onClick={() => setShowExportMenu(false)}
+                      className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium ${themeStyles.text} hover:bg-[#F8DDE8]/40 transition-colors`}
+                    >
+                      <FileText className="h-4 w-4" />
+                      <span>Structured JSON</span>
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Right: Customization Controls */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Search Input Toggle */}
-            <div className="relative hidden md:block">
-              <Search className={`pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 ${themeStyles.mutedText}`} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Find in book..."
-                className={`rounded-xl border ${themeStyles.border} ${themeStyles.pageBg} py-1.5 pl-8 pr-6 text-xs ${themeStyles.text} focus:outline-none focus:ring-1 focus:ring-[#E9A9C3] w-36`}
-              />
-              {searchQuery && (
+          {/* Dedicated Mobile Controls Bar: Font Size & Theme Selectors */}
+          <div className={`flex sm:hidden items-center justify-between pt-2 mt-2 border-t ${themeStyles.border} gap-2`}>
+            {/* Font Size Selector (Mobile) */}
+            <div className="flex items-center gap-1.5">
+              <span className={`text-[10px] font-semibold uppercase tracking-wider ${themeStyles.mutedText}`}>
+                Font:
+              </span>
+              <div className={`flex items-center rounded-xl border ${themeStyles.border} ${themeStyles.pageBg} p-0.5`}>
+                {(["sm", "md", "lg", "xl"] as FontSize[]).map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => setFontSize(size)}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-medium uppercase transition-colors ${
+                      fontSize === size ? themeStyles.activePill : themeStyles.mutedText
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Reading Theme Selector (Mobile) */}
+            <div className="flex items-center gap-1.5">
+              <span className={`text-[10px] font-semibold uppercase tracking-wider ${themeStyles.mutedText}`}>
+                Theme:
+              </span>
+              <div className={`flex items-center rounded-xl border ${themeStyles.border} ${themeStyles.pageBg} p-0.5`}>
                 <button
                   type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-[#77716D]"
+                  onClick={() => setTheme("light")}
+                  title="Light Theme"
+                  className={`rounded-lg p-1.5 transition-colors ${theme === "light" ? themeStyles.activePill : themeStyles.mutedText}`}
                 >
-                  <X className="h-3 w-3" />
+                  <Sun className="h-3.5 w-3.5" />
                 </button>
-              )}
-            </div>
-
-            {/* Mode Toggle: Page by Page vs Continuous */}
-            <button
-              type="button"
-              onClick={() => setIsContinuous(!isContinuous)}
-              title={isContinuous ? "Switch to Page-by-Page Reading" : "Switch to Continuous Scrolling"}
-              className={`flex items-center gap-1 rounded-xl border ${themeStyles.border} ${themeStyles.buttonBg} p-2 text-xs font-medium ${themeStyles.text} transition-colors`}
-            >
-              <Scroll className="h-3.5 w-3.5" />
-              <span className="hidden lg:inline">{isContinuous ? "Continuous" : "Paged"}</span>
-            </button>
-
-            {/* Font Size Selector */}
-            <div className={`flex items-center rounded-xl border ${themeStyles.border} ${themeStyles.pageBg} p-0.5`}>
-              {(["sm", "md", "lg", "xl"] as FontSize[]).map((size) => (
                 <button
-                  key={size}
-                  onClick={() => setFontSize(size)}
-                  className={`rounded-lg px-2 py-1 text-xs font-medium uppercase transition-colors ${
-                    fontSize === size ? themeStyles.activePill : themeStyles.mutedText
-                  }`}
+                  type="button"
+                  onClick={() => setTheme("sepia")}
+                  title="Sepia Theme"
+                  className={`rounded-lg p-1.5 transition-colors ${theme === "sepia" ? themeStyles.activePill : themeStyles.mutedText}`}
                 >
-                  {size}
+                  <Coffee className="h-3.5 w-3.5" />
                 </button>
-              ))}
-            </div>
-
-            {/* Reading Theme Selector */}
-            <div className={`flex items-center rounded-xl border ${themeStyles.border} ${themeStyles.pageBg} p-0.5`}>
-              <button
-                type="button"
-                onClick={() => setTheme("light")}
-                title="Light Theme"
-                className={`rounded-lg p-1.5 transition-colors ${theme === "light" ? themeStyles.activePill : themeStyles.mutedText}`}
-              >
-                <Sun className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setTheme("sepia")}
-                title="Sepia Theme"
-                className={`rounded-lg p-1.5 transition-colors ${theme === "sepia" ? themeStyles.activePill : themeStyles.mutedText}`}
-              >
-                <Coffee className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setTheme("dark")}
-                title="Dark Theme"
-                className={`rounded-lg p-1.5 transition-colors ${theme === "dark" ? themeStyles.activePill : themeStyles.mutedText}`}
-              >
-                <Moon className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            {/* Export Menu Dropdown */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowExportMenu(!showExportMenu)}
-                className={`flex items-center gap-1 rounded-xl border ${themeStyles.border} ${themeStyles.buttonBg} p-2 text-xs font-medium ${themeStyles.text} transition-colors`}
-              >
-                <Download className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Export</span>
-              </button>
-
-              {showExportMenu && (
-                <div className={`absolute right-0 mt-2 w-44 rounded-2xl border ${themeStyles.border} ${themeStyles.cardBg} p-2 shadow-xl z-50`}>
-                  <a
-                    href={getBookPdfUrl(book.id)}
-                    download
-                    onClick={() => setShowExportMenu(false)}
-                    className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium ${themeStyles.text} hover:bg-[#F8DDE8]/40 transition-colors`}
-                  >
-                    <FileDown className="h-4 w-4 text-[#E9A9C3]" />
-                    <span>Download PDF</span>
-                  </a>
-                  <a
-                    href={getBookExportUrl(book.id, "txt")}
-                    download
-                    onClick={() => setShowExportMenu(false)}
-                    className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium ${themeStyles.text} hover:bg-[#F8DDE8]/40 transition-colors`}
-                  >
-                    <FileText className="h-4 w-4" />
-                    <span>Plain Text (TXT)</span>
-                  </a>
-                  <a
-                    href={getBookExportUrl(book.id, "srt")}
-                    download
-                    onClick={() => setShowExportMenu(false)}
-                    className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium ${themeStyles.text} hover:bg-[#F8DDE8]/40 transition-colors`}
-                  >
-                    <FileText className="h-4 w-4" />
-                    <span>Subtitles (SRT)</span>
-                  </a>
-                  <a
-                    href={getBookExportUrl(book.id, "json")}
-                    download
-                    onClick={() => setShowExportMenu(false)}
-                    className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium ${themeStyles.text} hover:bg-[#F8DDE8]/40 transition-colors`}
-                  >
-                    <FileText className="h-4 w-4" />
-                    <span>Structured JSON</span>
-                  </a>
-                </div>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setTheme("dark")}
+                  title="Dark Theme"
+                  className={`rounded-lg p-1.5 transition-colors ${theme === "dark" ? themeStyles.activePill : themeStyles.mutedText}`}
+                >
+                  <Moon className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
