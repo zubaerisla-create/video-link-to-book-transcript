@@ -18,6 +18,12 @@ from youtube_transcript_api._errors import (
     TranslationLanguageNotAvailable,
 )
 
+import os
+import http.cookiejar
+import requests
+from youtube_transcript_api.proxies import GenericProxyConfig
+from server.app.config import settings
+
 from server.app.schemas.transcript import (
     TranscriptLanguage,
     TranscriptSegment,
@@ -31,6 +37,44 @@ class YouTubeError(Exception):
         self.message = message
         self.code = code
         self.status_code = status_code
+
+
+logger = logging.getLogger("transcriptly.youtube")
+
+
+def get_youtube_transcript_api() -> YouTubeTranscriptApi:
+    """
+    Initializes YouTubeTranscriptApi with optional proxy configuration
+    and loaded browser cookies if available.
+    """
+    proxy_config = None
+    if settings.YOUTUBE_PROXY:
+        proxy_config = GenericProxyConfig(
+            http_url=settings.YOUTUBE_PROXY,
+            https_url=settings.YOUTUBE_PROXY,
+        )
+
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+    })
+
+    cookie_path = settings.YOUTUBE_COOKIES_PATH or (
+        "/var/www/transcriptly/cookies.txt" if os.path.exists("/var/www/transcriptly/cookies.txt") else (
+            "cookies.txt" if os.path.exists("cookies.txt") else ""
+        )
+    )
+    if cookie_path and os.path.exists(cookie_path):
+        try:
+            jar = http.cookiejar.MozillaCookieJar(cookie_path)
+            jar.load(ignore_discard=True, ignore_expires=True)
+            session.cookies = jar
+            logger.info("Loaded YouTube cookies from %s", cookie_path)
+        except Exception as e:
+            logger.warning("Failed to load cookie file %s: %s", cookie_path, e)
+
+    return YouTubeTranscriptApi(proxy_config=proxy_config, http_client=session)
 
 
 def extract_video_id(url_or_id: str) -> str:
@@ -131,7 +175,7 @@ def list_transcript_languages(video_id: str) -> List[TranscriptLanguage]:
     Lists available transcript tracks for the video.
     """
     try:
-        api = YouTubeTranscriptApi()
+        api = get_youtube_transcript_api()
         transcript_list = api.list(video_id)
         result: List[TranscriptLanguage] = []
         for t in transcript_list:
@@ -149,14 +193,11 @@ def list_transcript_languages(video_id: str) -> List[TranscriptLanguage]:
     except (VideoUnavailable, VideoUnplayable):
         raise YouTubeError("Video is unavailable or private", "VIDEO_UNAVAILABLE", 404)
     except (RequestBlocked, IpBlocked, PoTokenRequired):
-        raise YouTubeError("YouTube caption access is temporarily rate-limited", "YOUTUBE_BLOCKED", 429)
+        raise YouTubeError("YouTube caption access is temporarily rate-limited. Please retry shortly.", "YOUTUBE_BLOCKED", 429)
     except InvalidVideoId:
         raise YouTubeError("Invalid YouTube video ID", "INVALID_URL", 400)
     except Exception as e:
         raise YouTubeError(f"Failed to list caption tracks: {str(e)}", "CAPTIONS_ERROR", 500)
-
-
-logger = logging.getLogger("transcriptly.youtube")
 
 
 def detect_script_language(text: Optional[str]) -> Optional[str]:
@@ -301,7 +342,7 @@ def fetch_raw_transcript(
     (raw_segments, language_name, language_code, is_generated, available_languages, track_object)
     """
     try:
-        api = YouTubeTranscriptApi()
+        api = get_youtube_transcript_api()
         transcript_list = api.list(video_id)
     except TranscriptsDisabled:
         raise YouTubeError("Captions are disabled by the owner for this video", "NO_CAPTIONS", 404)

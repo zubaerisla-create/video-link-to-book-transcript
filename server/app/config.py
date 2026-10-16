@@ -75,6 +75,10 @@ class Settings(BaseModel):
     # Translation Settings
     DEFAULT_TRANSLATION_PROVIDER: str = os.getenv("DEFAULT_TRANSLATION_PROVIDER", "auto")
 
+    # YouTube Proxy & Cookies Settings
+    YOUTUBE_PROXY: str = os.getenv("YOUTUBE_PROXY", "")
+    YOUTUBE_COOKIES_PATH: str = os.getenv("YOUTUBE_COOKIES_PATH", "")
+
 
 settings = Settings()
 

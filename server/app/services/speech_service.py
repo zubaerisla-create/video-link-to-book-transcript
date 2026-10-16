@@ -110,6 +110,20 @@ def download_audio_stream(video_id: str) -> str:
 
     ydl_opts["match_filter"] = duration_filter
 
+    # Check for cookies.txt
+    cookie_path = settings.YOUTUBE_COOKIES_PATH or (
+        "/var/www/transcriptly/cookies.txt" if os.path.exists("/var/www/transcriptly/cookies.txt") else (
+            "cookies.txt" if os.path.exists("cookies.txt") else ""
+        )
+    )
+    if cookie_path and os.path.exists(cookie_path):
+        ydl_opts["cookiefile"] = cookie_path
+        logger.info("Using YouTube cookie file for yt-dlp: %s", cookie_path)
+
+    if settings.YOUTUBE_PROXY:
+        ydl_opts["proxy"] = settings.YOUTUBE_PROXY
+        logger.info("Using proxy for yt-dlp: %s", settings.YOUTUBE_PROXY)
+
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.extract_info(video_url, download=True)
@@ -119,9 +133,15 @@ def download_audio_stream(video_id: str) -> str:
         if duration_error:
             raise SpeechRecognitionError(duration_error, "DURATION_LIMIT_EXCEEDED", 400)
         err_msg = str(e)
-        if "Private video" in err_msg or "Sign in" in err_msg:
+        if "not a bot" in err_msg or "confirm you're not a bot" in err_msg or "confirm you’re not a bot" in err_msg:
             raise SpeechRecognitionError(
-                "This video is private, restricted, or requires login. Speech recognition cannot access it.",
+                "YouTube has temporarily throttled automated caption requests from the server ('Sign in to confirm you are not a bot').",
+                "YOUTUBE_BLOCKED",
+                429
+            )
+        if "Private video" in err_msg or ("Sign in" in err_msg and "bot" not in err_msg):
+            raise SpeechRecognitionError(
+                "This video is private, restricted, or requires YouTube account login.",
                 "VIDEO_RESTRICTED",
                 403
             )

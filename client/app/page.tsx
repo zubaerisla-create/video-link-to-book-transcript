@@ -83,7 +83,7 @@ function HomePageContent() {
   const [languageMode, setLanguageMode] = useState<LanguageMode>("original");
   const [outputLanguage, setOutputLanguage] = useState<string>("auto");
   const [targetLanguage, setTargetLanguage] = useState<string>("bn");
-  const [enableSpeechFallback, setEnableSpeechFallback] = useState<boolean>(true);
+  const [enableSpeechFallback, setEnableSpeechFallback] = useState<boolean>(false);
 
   // Results & Loading
   const [isLoading, setIsLoading] = useState(false);
@@ -207,9 +207,12 @@ function HomePageContent() {
         } else if (err.code === "VIDEO_UNAVAILABLE") {
           userMessage =
             "This YouTube video is unavailable, private, or has been removed.";
+        } else if (err.code === "VIDEO_RESTRICTED") {
+          userMessage =
+            "This video is age-restricted or requires YouTube account login.";
         } else if (err.code === "YOUTUBE_BLOCKED") {
           userMessage =
-            "YouTube has temporarily throttled caption requests from this network. Please wait a moment and retry.";
+            "YouTube has temporarily throttled automated caption requests from the server. Please wait a moment and retry.";
         } else if (err.code === "INVALID_URL") {
           userMessage =
             "The YouTube link appears invalid or contains an unsupported video ID.";
