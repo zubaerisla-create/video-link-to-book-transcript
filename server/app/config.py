@@ -79,6 +79,14 @@ class Settings(BaseModel):
     YOUTUBE_PROXY: str = os.getenv("YOUTUBE_PROXY", "")
     YOUTUBE_COOKIES_PATH: str = os.getenv("YOUTUBE_COOKIES_PATH", "")
 
+    # Transcript Reliability, Concurrency & Caching Settings
+    MAX_CONCURRENT_TRANSCRIPT_JOBS: int = int(os.getenv("MAX_CONCURRENT_TRANSCRIPT_JOBS", "3"))
+    TRANSCRIPT_QUEUE_TIMEOUT_SECONDS: float = float(os.getenv("TRANSCRIPT_QUEUE_TIMEOUT_SECONDS", "15.0"))
+    TRANSCRIPT_CACHE_TTL_SECONDS: int = int(os.getenv("TRANSCRIPT_CACHE_TTL_SECONDS", "600"))
+    TRANSCRIPT_MAX_RETRIES: int = int(os.getenv("TRANSCRIPT_MAX_RETRIES", "2"))
+    TRANSCRIPT_INITIAL_BACKOFF_SECONDS: float = float(os.getenv("TRANSCRIPT_INITIAL_BACKOFF_SECONDS", "1.0"))
+    TRANSCRIPT_MAX_BACKOFF_SECONDS: float = float(os.getenv("TRANSCRIPT_MAX_BACKOFF_SECONDS", "8.0"))
+
 
 settings = Settings()
 

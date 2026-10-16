@@ -90,6 +90,23 @@ function HomePageContent() {
   const [loadingMessage, setLoadingMessage] = useState("Extracting transcript...");
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [result, setResult] = useState<TranscriptResponse | null>(null);
+  const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
+
+  // Rate limit cooldown countdown timer
+  useEffect(() => {
+    if (retryCountdown === null || retryCountdown <= 0) return;
+
+    const interval = setInterval(() => {
+      setRetryCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [retryCountdown]);
 
   // Save Book to Library Modal state
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -143,6 +160,7 @@ function HomePageContent() {
     setUrl("");
     setUrlError(null);
     setError(null);
+    setRetryCountdown(null);
   };
 
   const handlePaste = async () => {
@@ -158,8 +176,60 @@ function HomePageContent() {
     }
   };
 
+  // Centralized API error handler with rate-limit countdown
+  const handleApiError = (err: unknown) => {
+    if (err instanceof ApiError) {
+      let userMessage = err.message;
+      if (err.code === "NO_CAPTIONS") {
+        userMessage =
+          "No accessible captions or subtitles were found for this video. You can enable the Speech-to-Text fallback checkbox above to recognize the audio locally.";
+      } else if (err.code === "VIDEO_UNAVAILABLE") {
+        userMessage =
+          "This YouTube video is unavailable, private, or has been removed.";
+      } else if (err.code === "VIDEO_RESTRICTED") {
+        userMessage =
+          "This video is age-restricted or requires YouTube account login.";
+      } else if (err.code === "YOUTUBE_BLOCKED") {
+        userMessage =
+          "YouTube has temporarily throttled automated caption requests from the server. Please wait before retrying.";
+      } else if (err.code === "RATE_LIMIT_EXCEEDED") {
+        userMessage =
+          "Too many requests from your device. Please wait a moment before trying again.";
+      } else if (err.code === "SERVER_BUSY") {
+        userMessage =
+          "The transcript service is currently busy processing concurrent requests. Please wait a moment and retry.";
+      } else if (err.code === "INVALID_URL") {
+        userMessage =
+          "The YouTube link appears invalid or contains an unsupported video ID.";
+      }
+
+      // If throttled or rate-limited, start bounded countdown timer
+      if (
+        err.statusCode === 429 ||
+        err.code === "YOUTUBE_BLOCKED" ||
+        err.code === "RATE_LIMIT_EXCEEDED" ||
+        err.code === "SERVER_BUSY"
+      ) {
+        const delay = err.retryAfter && err.retryAfter > 0 ? err.retryAfter : 15;
+        setRetryCountdown(delay);
+      }
+
+      setError({ message: userMessage, code: err.code });
+    } else {
+      setError({
+        message:
+          "Could not connect to the transcript extraction service. Please check your internet connection and try again.",
+        code: "NETWORK_ERROR",
+      });
+    }
+  };
+
   // Execute extraction
   const handleExtract = async (overrideUrl?: string) => {
+    if (retryCountdown !== null && retryCountdown > 0) {
+      return;
+    }
+
     const targetUrl = (overrideUrl || url).trim();
 
     if (!targetUrl) {
@@ -199,32 +269,7 @@ function HomePageContent() {
         setViewMode("translated");
       }
     } catch (err: unknown) {
-      if (err instanceof ApiError) {
-        let userMessage = err.message;
-        if (err.code === "NO_CAPTIONS") {
-          userMessage =
-            "No accessible captions or subtitles were found for this video. You can enable the Speech-to-Text fallback checkbox above to recognize the audio locally.";
-        } else if (err.code === "VIDEO_UNAVAILABLE") {
-          userMessage =
-            "This YouTube video is unavailable, private, or has been removed.";
-        } else if (err.code === "VIDEO_RESTRICTED") {
-          userMessage =
-            "This video is age-restricted or requires YouTube account login.";
-        } else if (err.code === "YOUTUBE_BLOCKED") {
-          userMessage =
-            "YouTube has temporarily throttled automated caption requests from the server. Please wait a moment and retry.";
-        } else if (err.code === "INVALID_URL") {
-          userMessage =
-            "The YouTube link appears invalid or contains an unsupported video ID.";
-        }
-        setError({ message: userMessage, code: err.code });
-      } else {
-        setError({
-          message:
-            "Could not connect to the transcript extraction service. Please check your internet connection and try again.",
-          code: "NETWORK_ERROR",
-        });
-      }
+      handleApiError(err);
     } finally {
       setIsLoading(false);
     }
@@ -232,6 +277,7 @@ function HomePageContent() {
 
   // Re-translate when target language changes after extraction
   const handleTargetLanguageChange = async (newTargetLang: string) => {
+    if (retryCountdown !== null && retryCountdown > 0) return;
     setTargetLanguage(newTargetLang);
     if (!result || !url) return;
 
@@ -249,9 +295,7 @@ function HomePageContent() {
       setResult(data);
       setViewMode("translated");
     } catch (err: unknown) {
-      if (err instanceof ApiError) {
-        setError({ message: err.message, code: err.code });
-      }
+      handleApiError(err);
     } finally {
       setIsLoading(false);
     }
@@ -259,6 +303,7 @@ function HomePageContent() {
 
   // Paragraph length change
   const handleParagraphLengthChange = async (newLength: ParagraphLengthMode) => {
+    if (retryCountdown !== null && retryCountdown > 0) return;
     setParagraphLength(newLength);
     if (!result || !url) return;
 
@@ -275,9 +320,7 @@ function HomePageContent() {
       });
       setResult(data);
     } catch (err: unknown) {
-      if (err instanceof ApiError) {
-        setError({ message: err.message, code: err.code });
-      }
+      handleApiError(err);
     } finally {
       setIsLoading(false);
     }
@@ -288,6 +331,7 @@ function HomePageContent() {
     setUrl("");
     setUrlError(null);
     setError(null);
+    setRetryCountdown(null);
     setResult(null);
     setSearchQuery("");
     setCopied(false);
@@ -679,13 +723,18 @@ function HomePageContent() {
           <div className="pt-2 flex justify-end">
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || (retryCountdown !== null && retryCountdown > 0)}
               className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-[#E9A9C3] px-7 py-3 text-sm font-semibold text-[#292522] hover:bg-[#DE91B1] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xs"
             >
               {isLoading ? (
                 <>
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#292522] border-t-transparent" />
                   <span>{loadingMessage}</span>
+                </>
+              ) : retryCountdown !== null && retryCountdown > 0 ? (
+                <>
+                  <Clock className="h-4 w-4" />
+                  <span>Retry in {retryCountdown}s</span>
                 </>
               ) : (
                 <>
@@ -700,23 +749,61 @@ function HomePageContent() {
 
       {/* Error state */}
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50/50 p-6 mb-8 shadow-xs">
+        <div
+          className={`rounded-2xl border p-6 mb-8 shadow-xs ${
+            error.code === "YOUTUBE_BLOCKED" ||
+            error.code === "RATE_LIMIT_EXCEEDED" ||
+            error.code === "SERVER_BUSY"
+              ? "border-amber-200 bg-amber-50/50"
+              : "border-red-200 bg-red-50/50"
+          }`}
+        >
           <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600">
+            <div
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                error.code === "YOUTUBE_BLOCKED" ||
+                error.code === "RATE_LIMIT_EXCEEDED" ||
+                error.code === "SERVER_BUSY"
+                  ? "bg-amber-100 text-amber-700"
+                  : "bg-red-100 text-red-600"
+              }`}
+            >
               <AlertCircle className="h-5 w-5" />
             </div>
             <div className="flex-1">
               <h2 className="text-base font-semibold text-[#292522] mb-1">
-                Could not retrieve transcript
+                {error.code === "YOUTUBE_BLOCKED" ||
+                error.code === "RATE_LIMIT_EXCEEDED" ||
+                error.code === "SERVER_BUSY"
+                  ? "Request Temporarily Throttled"
+                  : "Could not retrieve transcript"}
               </h2>
-              <p className="text-sm text-[#77716D] leading-relaxed mb-4">{error.message}</p>
+              <p className="text-sm text-[#77716D] leading-relaxed mb-3">
+                {error.message}
+              </p>
+
+              {retryCountdown !== null && retryCountdown > 0 && (
+                <div className="flex items-center gap-2 mb-4 text-xs font-medium text-amber-800 bg-amber-100/80 px-3 py-1.5 rounded-lg w-fit">
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>
+                    Retry will become available in {retryCountdown} second
+                    {retryCountdown === 1 ? "" : "s"}
+                  </span>
+                </div>
+              )}
+
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => handleExtract()}
-                  className="rounded-lg bg-white border border-[#F0E8E2] px-3.5 py-1.5 text-xs font-medium text-[#292522] hover:bg-[#F8DDE8] transition-colors"
+                  disabled={
+                    isLoading || (retryCountdown !== null && retryCountdown > 0)
+                  }
+                  className="rounded-lg bg-white border border-[#F0E8E2] px-3.5 py-1.5 text-xs font-medium text-[#292522] hover:bg-[#F8DDE8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  Retry Request
+                  {retryCountdown !== null && retryCountdown > 0
+                    ? `Retry available in ${retryCountdown}s`
+                    : "Retry Request"}
                 </button>
                 <button
                   type="button"

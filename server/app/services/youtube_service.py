@@ -1,7 +1,10 @@
 import re
 import urllib.parse
 import logging
-from typing import Optional, List, Tuple, Any
+import random
+import asyncio
+import inspect
+from typing import Optional, List, Tuple, Any, Callable
 import httpx
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import (
@@ -23,6 +26,7 @@ import http.cookiejar
 import requests
 from youtube_transcript_api.proxies import GenericProxyConfig
 from server.app.config import settings
+from server.app.services.transcript_coordinator import sanitize_details
 
 from server.app.schemas.transcript import (
     TranscriptLanguage,
@@ -32,14 +36,43 @@ from server.app.schemas.transcript import (
 
 
 class YouTubeError(Exception):
-    def __init__(self, message: str, code: str, status_code: int = 400):
+    def __init__(self, message: str, code: str, status_code: int = 400, retry_after: Optional[int] = None):
         super().__init__(message)
         self.message = message
         self.code = code
         self.status_code = status_code
+        self.retry_after = retry_after
 
 
 logger = logging.getLogger("transcriptly.youtube")
+
+
+def extract_retry_after(exc: Exception) -> Optional[int]:
+    """
+    Safely extracts Retry-After in seconds from exception or response headers if present.
+    Also extracts from string exception messages when available.
+    """
+    resp = getattr(exc, "response", None) or getattr(getattr(exc, "http_error", None), "response", None)
+    if resp is not None and hasattr(resp, "headers"):
+        val = resp.headers.get("Retry-After")
+        if val:
+            try:
+                seconds = int(val)
+                if seconds > 0:
+                    return seconds
+            except ValueError:
+                pass
+
+    # Fallback to inspecting exception message
+    msg = str(exc)
+    match = re.search(r"retry\s+(?:in|after)\s+(\d+)\s*s(?:ec(?:ond)?s?)?", msg, re.IGNORECASE)
+    if match:
+        try:
+            return int(match.group(1))
+        except ValueError:
+            pass
+
+    return None
 
 
 def get_youtube_transcript_api() -> YouTubeTranscriptApi:
@@ -192,12 +225,33 @@ def list_transcript_languages(video_id: str) -> List[TranscriptLanguage]:
         return []
     except (VideoUnavailable, VideoUnplayable):
         raise YouTubeError("Video is unavailable or private", "VIDEO_UNAVAILABLE", 404)
-    except (RequestBlocked, IpBlocked, PoTokenRequired):
-        raise YouTubeError("YouTube caption access is temporarily rate-limited. Please retry shortly.", "YOUTUBE_BLOCKED", 429)
+    except (RequestBlocked, IpBlocked, PoTokenRequired) as e:
+        retry_after = extract_retry_after(e) or 30
+        logger.warning(
+            "Upstream YouTube caption access throttled/blocked while listing tracks for %s: exc=%s, sanitized=%s, retry_after=%s",
+            video_id,
+            type(e).__name__,
+            sanitize_details(e),
+            retry_after,
+        )
+        raise YouTubeError(
+            "YouTube caption access is temporarily rate-limited. Please retry shortly.",
+            "YOUTUBE_BLOCKED",
+            429,
+            retry_after=retry_after,
+        )
     except InvalidVideoId:
         raise YouTubeError("Invalid YouTube video ID", "INVALID_URL", 400)
     except Exception as e:
-        raise YouTubeError(f"Failed to list caption tracks: {str(e)}", "CAPTIONS_ERROR", 500)
+        retry_after = extract_retry_after(e)
+        sanitized = sanitize_details(e)
+        logger.error(
+            "Unexpected error listing caption tracks for %s: exc=%s, sanitized=%s",
+            video_id,
+            type(e).__name__,
+            sanitized,
+        )
+        raise YouTubeError(f"Failed to list caption tracks: {sanitized}", "CAPTIONS_ERROR", 500, retry_after=retry_after)
 
 
 def detect_script_language(text: Optional[str]) -> Optional[str]:
@@ -350,12 +404,33 @@ def fetch_raw_transcript(
         raise YouTubeError("No captions found for this video", "NO_CAPTIONS", 404)
     except (VideoUnavailable, VideoUnplayable):
         raise YouTubeError("Video is unavailable or private", "VIDEO_UNAVAILABLE", 404)
-    except (RequestBlocked, IpBlocked, PoTokenRequired):
-        raise YouTubeError("YouTube caption access is temporarily rate-limited. Please retry shortly.", "YOUTUBE_BLOCKED", 429)
+    except (RequestBlocked, IpBlocked, PoTokenRequired) as e:
+        retry_after = extract_retry_after(e) or 30
+        logger.warning(
+            "Upstream YouTube caption retrieval throttled/blocked for %s: exc=%s, sanitized=%s, retry_after=%s",
+            video_id,
+            type(e).__name__,
+            sanitize_details(e),
+            retry_after,
+        )
+        raise YouTubeError(
+            "YouTube caption access is temporarily rate-limited. Please retry shortly.",
+            "YOUTUBE_BLOCKED",
+            429,
+            retry_after=retry_after,
+        )
     except InvalidVideoId:
         raise YouTubeError("Invalid YouTube video ID", "INVALID_URL", 400)
     except Exception as e:
-        raise YouTubeError(f"Unable to retrieve captions: {str(e)}", "RETRIEVAL_FAILED", 500)
+        retry_after = extract_retry_after(e)
+        sanitized = sanitize_details(e)
+        logger.error(
+            "Unexpected error retrieving captions for %s: exc=%s, sanitized=%s",
+            video_id,
+            type(e).__name__,
+            sanitized,
+        )
+        raise YouTubeError(f"Unable to retrieve captions: {sanitized}", "RETRIEVAL_FAILED", 500, retry_after=retry_after)
 
     track_list = list(transcript_list)
     available_languages: List[TranscriptLanguage] = []
@@ -426,8 +501,25 @@ def fetch_raw_transcript(
             is_gen,
         )
         return raw_data, lang_name, lang_code, is_gen, available_languages, target_track
+    except (RequestBlocked, IpBlocked, PoTokenRequired) as e:
+        retry_after = extract_retry_after(e) or 30
+        logger.warning(
+            "Upstream YouTube caption content download throttled for %s: exc=%s, sanitized=%s, retry_after=%s",
+            video_id,
+            type(e).__name__,
+            sanitize_details(e),
+            retry_after,
+        )
+        raise YouTubeError(
+            "YouTube caption access is temporarily rate-limited. Please retry shortly.",
+            "YOUTUBE_BLOCKED",
+            429,
+            retry_after=retry_after,
+        )
     except Exception as e:
-        raise YouTubeError(f"Failed to fetch subtitle content: {str(e)}", "FETCH_FAILED", 500)
+        retry_after = extract_retry_after(e)
+        sanitized = sanitize_details(e)
+        raise YouTubeError(f"Failed to fetch subtitle content: {sanitized}", "FETCH_FAILED", 500, retry_after=retry_after)
 
 
 def try_youtube_translate_track(track_object: Any, target_language: str) -> Optional[List[dict]]:
@@ -455,3 +547,65 @@ def try_youtube_translate_track(track_object: Any, target_language: str) -> Opti
         return fetched.to_raw_data()
     except (TranslationLanguageNotAvailable, Exception):
         return None
+
+
+async def fetch_raw_transcript_with_retry(
+    video_id: str,
+    preferred_language: Optional[str] = None,
+    video_title: Optional[str] = None,
+    fetcher: Optional[Callable] = None,
+) -> Tuple[List[dict], str, str, bool, List[TranscriptLanguage], Any]:
+    """
+    Executes fetch_raw_transcript with bounded exponential backoff and jitter for transient throttling.
+    Never loops indefinitely. Respects Retry-After when available.
+    """
+    if fetcher is None:
+        fetcher = fetch_raw_transcript
+
+    max_retries = max(0, settings.TRANSCRIPT_MAX_RETRIES)
+    attempt = 0
+
+    while True:
+        try:
+            res = fetcher(
+                video_id=video_id,
+                preferred_language=preferred_language,
+                video_title=video_title,
+            )
+            if inspect.isawaitable(res):
+                return await res
+            return res
+        except YouTubeError as ye:
+            # If not rate-limited (e.g. 404 NO_CAPTIONS, 400 INVALID_URL), do not retry
+            if ye.status_code != 429 or attempt >= max_retries:
+                raise
+
+            retry_after = ye.retry_after
+            # If retry_after exceeds maximum allowed transient backoff, abort retry and let caller handle
+            if retry_after and retry_after > settings.TRANSCRIPT_MAX_BACKOFF_SECONDS:
+                logger.info(
+                    "Retry-After (%ss) exceeds max transient backoff (%ss) for %s; aborting immediate retry.",
+                    retry_after,
+                    settings.TRANSCRIPT_MAX_BACKOFF_SECONDS,
+                    video_id,
+                )
+                raise
+
+            # Bounded exponential backoff with random jitter
+            base_delay = (
+                retry_after
+                if (retry_after and retry_after <= settings.TRANSCRIPT_MAX_BACKOFF_SECONDS)
+                else (settings.TRANSCRIPT_INITIAL_BACKOFF_SECONDS * (2 ** attempt))
+            )
+            jitter = random.uniform(-0.25, 0.25)
+            delay = max(0.5, min(base_delay + jitter, settings.TRANSCRIPT_MAX_BACKOFF_SECONDS))
+
+            attempt += 1
+            logger.warning(
+                "Transient throttling encountered for %s (attempt %d/%d). Backing off for %.2fs...",
+                video_id,
+                attempt,
+                max_retries,
+                delay,
+            )
+            await asyncio.sleep(delay)

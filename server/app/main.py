@@ -29,6 +29,18 @@ async def lifespan(app: FastAPI):
     yield
 
 
+def extract_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        first_ip = forwarded.split(",")[0].strip()
+        if first_ip:
+            return first_ip
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    return request.client.host if request.client else "127.0.0.1"
+
+
 # In-memory rate limiter per IP with strict limits on auth
 class RateLimitMiddleware(BaseHTTPMiddleware):
     def __init__(
@@ -51,7 +63,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if path == "/api/health":
             return await call_next(request)
 
-        client_ip = request.client.host if request.client else "127.0.0.1"
+        client_ip = extract_client_ip(request)
         now = time.time()
 
         # Stricter rate limit on auth endpoints (brute force mitigation)
@@ -60,11 +72,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 t for t in self.auth_ip_records[client_ip] if now - t < self.window_seconds
             ]
             if len(auth_timestamps) >= self.auth_max_requests:
+                oldest = auth_timestamps[0]
+                retry_after = max(1, int(self.window_seconds - (now - oldest)))
                 return JSONResponse(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    headers={"Retry-After": str(retry_after)},
                     content={
-                        "detail": "Too many authentication attempts. Please slow down and try again shortly.",
+                        "detail": f"Too many authentication attempts. Please slow down and try again in {retry_after} seconds.",
                         "code": "AUTH_RATE_LIMIT_EXCEEDED",
+                        "retry_after": retry_after,
                     },
                 )
             auth_timestamps.append(now)
@@ -74,11 +90,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         timestamps = self.ip_records[client_ip]
         valid_timestamps = [t for t in timestamps if now - t < self.window_seconds]
         if len(valid_timestamps) >= self.max_requests:
+            oldest = valid_timestamps[0]
+            retry_after = max(1, int(self.window_seconds - (now - oldest)))
             return JSONResponse(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                headers={"Retry-After": str(retry_after)},
                 content={
-                    "detail": "Too many requests. Please slow down and try again shortly.",
+                    "detail": f"Too many requests. Please slow down and try again in {retry_after} seconds.",
                     "code": "RATE_LIMIT_EXCEEDED",
+                    "retry_after": retry_after,
                 },
             )
 

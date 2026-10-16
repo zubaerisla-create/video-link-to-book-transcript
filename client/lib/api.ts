@@ -28,12 +28,19 @@ const API_BASE_URL = getApiBaseUrl();
 export class ApiError extends Error {
   code: string;
   statusCode: number;
+  retryAfter?: number;
 
-  constructor(message: string, code: string = "UNKNOWN_ERROR", statusCode: number = 500) {
+  constructor(
+    message: string,
+    code: string = "UNKNOWN_ERROR",
+    statusCode: number = 500,
+    retryAfter?: number
+  ) {
     super(message);
     this.name = "ApiError";
     this.code = code;
     this.statusCode = statusCode;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -41,6 +48,16 @@ async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let errorMessage = `Request failed with status ${res.status}`;
     let errorCode = "HTTP_ERROR";
+    let retryAfter: number | undefined = undefined;
+
+    // 1. Inspect HTTP standard Retry-After header
+    const headerRetryAfter = res.headers.get("Retry-After");
+    if (headerRetryAfter) {
+      const parsedSeconds = parseInt(headerRetryAfter, 10);
+      if (!isNaN(parsedSeconds) && parsedSeconds > 0) {
+        retryAfter = parsedSeconds;
+      }
+    }
 
     try {
       const errorData = await res.json();
@@ -48,15 +65,27 @@ async function handleResponse<T>(res: Response): Promise<T> {
         if (typeof errorData.detail === "string") {
           errorMessage = errorData.detail;
         } else if (typeof errorData.detail === "object") {
-          errorMessage = errorData.detail.detail || errorMessage;
+          errorMessage = errorData.detail.detail || errorData.detail.message || errorMessage;
           errorCode = errorData.detail.code || errorCode;
+          if (typeof errorData.detail.retry_after === "number" && errorData.detail.retry_after > 0) {
+            retryAfter = errorData.detail.retry_after;
+          }
         }
+      }
+      if (typeof errorData?.retry_after === "number" && errorData.retry_after > 0) {
+        retryAfter = errorData.retry_after;
+      }
+      if (typeof errorData?.code === "string") {
+        errorCode = errorData.code;
+      }
+      if (typeof errorData?.message === "string" && !errorData?.detail) {
+        errorMessage = errorData.message;
       }
     } catch {
       // response wasn't JSON
     }
 
-    throw new ApiError(errorMessage, errorCode, res.status);
+    throw new ApiError(errorMessage, errorCode, res.status, retryAfter);
   }
 
   return res.json();
