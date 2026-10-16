@@ -107,13 +107,16 @@ export default function AboutPage() {
         </div>
         <div className="space-y-3 text-sm text-[#77716D] leading-relaxed">
           <p>
-            <strong className="text-[#292522]">Accessible Captions Required:</strong> If a video lacks creator captions or auto-generated subtitles, or if the creator disabled subtitles, captions cannot be extracted. Transcriptly does not bypass authentication, age-restrictions, or private access controls.
+            <strong className="text-[#292522]">Multilingual & Original Language Integrity:</strong> Transcriptly automatically detects the video&apos;s true spoken language (such as Bangla, English, Hindi, Arabic, Urdu, Spanish, French) and preserves the original writing script without unwanted automated translation.
           </p>
           <p>
-            <strong className="text-[#292522]">No Audio Transcoding:</strong> Transcriptly deliberately refrains from converting multi-gigabyte audio tracks. This guarantees instant response times and avoids carbon-heavy GPU computation.
+            <strong className="text-[#292522]">Local Speech Recognition Fallback:</strong> When a public video lacks accessible caption tracks, Transcriptly offers an optional local speech recognition fallback powered by faster-whisper. The model executes directly on your machine without sending audio to paid APIs.
           </p>
           <p>
-            <strong className="text-[#292522]">Strict Rate Limiting:</strong> In order to respect YouTube platform guidelines and protect local instances from accidental request loops, Transcriptly incorporates local token rate limiting.
+            <strong className="text-[#292522]">Aligned Multilingual Translation:</strong> When translation mode is chosen, the engine translates transcripts using existing YouTube caption tracks or free modular translation providers, preserving paragraph structure and segment timestamp alignment.
+          </p>
+          <p>
+            <strong className="text-[#292522]">Ephemeral Processing:</strong> All temporary audio downloads and transcript texts exist strictly in temporary local memory and are never persisted in a database or shared with third parties.
           </p>
         </div>
       </div>

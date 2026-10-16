@@ -3,11 +3,14 @@ import re
 from typing import List, Dict, Any, Tuple
 from server.app.schemas.transcript import TranscriptSegment
 
+# Terminal punctuation marks across English, Bangla, Hindi, Arabic, Urdu, Spanish, French, etc.
+TERMINAL_PUNCTUATION = {".", "!", "?", "।", "॥", "؟", "۔"}
+
 
 def clean_text(raw_text: str) -> str:
     """
     Cleans raw subtitle text: unescapes HTML entities, replaces newlines and NBSP,
-    and collapses redundant spaces while preserving original wording.
+    and collapses redundant spaces while preserving original wording in any script.
     """
     if not raw_text:
         return ""
@@ -33,10 +36,9 @@ def remove_overlapping_words(prev_text: str, curr_text: str) -> str:
 
     max_check = min(len(prev_words), len(curr_words), 6)
     for n in range(max_check, 0, -1):
-        prev_tail = [w.lower().strip(".,!?:;\"'()[]{}") for w in prev_words[-n:]]
-        curr_head = [w.lower().strip(".,!?:;\"'()[]{}") for w in curr_words[:n]]
+        prev_tail = [w.lower().strip(".,!?:;\"'()[]{}|।؟۔") for w in prev_words[-n:]]
+        curr_head = [w.lower().strip(".,!?:;\"'()[]{}|।؟۔") for w in curr_words[:n]]
         if prev_tail == curr_head and len(prev_tail) > 0 and all(len(w) > 0 for w in prev_tail):
-            # Check if actual string matches reasonably
             return " ".join(curr_words[n:])
 
     return curr_text
@@ -76,7 +78,7 @@ def format_transcript_paragraphs(
     """
     Transforms messy subtitle segments into:
     1. Cleaned TranscriptSegments
-    2. Coherent, human-readable paragraphs
+    2. Coherent, human-readable paragraphs (supporting multilingual scripts)
     3. SRT formatted content
     4. Word count
     5. Character count
@@ -129,7 +131,7 @@ def format_transcript_paragraphs(
         prev_ends_sentence = False
         if current_para_segments:
             last_piece = current_para_segments[-1].rstrip()
-            if last_piece and last_piece[-1] in ".?!":
+            if last_piece and last_piece[-1] in TERMINAL_PUNCTUATION:
                 prev_ends_sentence = True
 
         should_split = False
@@ -143,8 +145,8 @@ def format_transcript_paragraphs(
 
         if should_split and current_para_segments:
             para_text = " ".join(current_para_segments).strip()
-            # Ensure spacing around punctuation is clean
-            para_text = re.sub(r"\s+([.,!?;:])", r"\1", para_text)
+            # Ensure spacing around standard punctuation is clean
+            para_text = re.sub(r"\s+([.,!?;:।॥؟۔])", r"\1", para_text)
             paragraphs.append(para_text)
             current_para_segments = []
             current_para_word_count = 0
@@ -157,7 +159,7 @@ def format_transcript_paragraphs(
     # Flush final paragraph
     if current_para_segments:
         para_text = " ".join(current_para_segments).strip()
-        para_text = re.sub(r"\s+([.,!?;:])", r"\1", para_text)
+        para_text = re.sub(r"\s+([.,!?;:।॥؟۔])", r"\1", para_text)
         paragraphs.append(para_text)
 
     # Calculate word and character count across formatted text

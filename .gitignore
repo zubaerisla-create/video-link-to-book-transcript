@@ -17,3 +17,12 @@ server/.env
 # Operating system
 .DS_Store
 *.log
+
+# Audio & Cache files
+/tmp/transcriptly_audio/
+*.mp3
+*.m4a
+*.wav
+*.webm
+.cache/
+huggingface/

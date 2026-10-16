@@ -129,24 +129,24 @@ export default function HowItWorksPage() {
         </div>
       </div>
 
-      {/* Limitations note callout */}
+      {/* Limitations and Speech-to-Text Fallback section */}
       <div className="rounded-2xl border border-[#F0E8E2] bg-[#FFF1B8]/40 p-6 flex flex-col sm:flex-row gap-4 items-start">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFF1B8] border border-[#F0E8E2] text-[#292522]">
           <AlertCircle className="h-5 w-5" />
         </div>
         <div>
           <h2 className="text-base font-semibold text-[#292522] mb-1">
-            Videos Without Accessible Captions
+            Videos Without Captions? Local Speech-to-Text Fallback
           </h2>
           <p className="text-sm text-[#77716D] leading-relaxed">
-            If a video does not have creator-uploaded subtitles or YouTube automated captions enabled by the channel owner, Transcriptly will inform you immediately. In such cases, caption tracks cannot be retrieved through standard extraction methods.
+            If a video does not have creator-uploaded subtitles or YouTube automated captions enabled, Transcriptly can automatically fall back to local speech recognition using <strong>faster-whisper</strong>. Audio streams are processed locally on your Linux Mint machine, spoken languages (such as Bangla or English) are detected automatically, and temporary files are cleaned up immediately.
           </p>
-          <div className="mt-4">
+          <div className="mt-4 flex items-center gap-3">
             <Link
               href="/"
               className="inline-flex items-center justify-center rounded-xl bg-[#E9A9C3] px-4 py-2 text-sm font-medium text-[#292522] hover:bg-[#DE91B1] transition-colors"
             >
-              Try extracting a transcript
+              Try extracting or translating a video
             </Link>
           </div>
         </div>

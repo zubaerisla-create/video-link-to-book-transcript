@@ -40,12 +40,16 @@ def test_successful_transcript_extraction(mock_fetch_transcript, mock_get_video_
         {"code": "en", "name": "English", "is_generated": False, "is_translatable": True}
     ]
 
+    mock_track = MagicMock()
+    mock_track.is_translatable = False
+
     mock_fetch_transcript.return_value = (
         mock_raw_segments,
         "English",
         "en",
         False,
         mock_available_langs,
+        mock_track,
     )
 
     response = client.post(

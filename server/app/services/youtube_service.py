@@ -1,6 +1,6 @@
 import re
 import urllib.parse
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Any
 import httpx
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import (
@@ -14,6 +14,7 @@ from youtube_transcript_api._errors import (
     InvalidVideoId,
     YouTubeRequestFailed,
     YouTubeTranscriptApiException,
+    TranslationLanguageNotAvailable,
 )
 
 from server.app.schemas.transcript import (
@@ -60,7 +61,6 @@ def extract_video_id(url_or_id: str) -> str:
 
     hostname = (parsed.hostname or "").lower()
     
-    # Check valid YouTube hostnames
     valid_hosts = {
         "youtube.com",
         "www.youtube.com",
@@ -120,7 +120,6 @@ async def get_video_info(video_id: str) -> Optional[VideoInfo]:
                     thumbnail_url=data.get("thumbnail_url"),
                 )
     except Exception:
-        # Gracefully handle network timeouts or failure to fetch metadata
         pass
 
     return None
@@ -156,13 +155,48 @@ def list_transcript_languages(video_id: str) -> List[TranscriptLanguage]:
         raise YouTubeError(f"Failed to list caption tracks: {str(e)}", "CAPTIONS_ERROR", 500)
 
 
+def detect_original_track(track_list: List[Any]) -> Any:
+    """
+    Identifies the video's original spoken language caption track.
+    - If an auto-generated track is present, its language represents the video's true spoken language.
+      If a creator-uploaded manual track exists in that same language, prefer the manual track.
+      Otherwise, use the auto-generated track.
+    - If no auto-generated track exists, prefer the first manual track.
+    - Fall back to the first available track.
+    """
+    if not track_list:
+        return None
+
+    # Check for auto-generated track (YouTube speech-recognition detected language)
+    auto_track = next((t for t in track_list if getattr(t, "is_generated", False)), None)
+    if auto_track:
+        auto_lang = getattr(auto_track, "language_code", "").lower()
+        # Look for a creator-uploaded manual track in that exact language
+        matching_manual = next(
+            (t for t in track_list if not getattr(t, "is_generated", False) and getattr(t, "language_code", "").lower() == auto_lang),
+            None
+        )
+        if matching_manual:
+            return matching_manual
+        return auto_track
+
+    # If no auto-generated track, choose the first creator-uploaded manual track
+    manual_track = next((t for t in track_list if not getattr(t, "is_generated", False)), None)
+    if manual_track:
+        return manual_track
+
+    # Fall back to first track
+    return track_list[0]
+
+
 def fetch_raw_transcript(
     video_id: str,
     preferred_language: Optional[str] = None
-) -> Tuple[List[dict], str, str, bool, List[TranscriptLanguage]]:
+) -> Tuple[List[dict], str, str, bool, List[TranscriptLanguage], Any]:
     """
-    Fetches raw transcript segments, handling preferred language, auto fallback,
-    and returns (raw_segments, language_name, language_code, is_generated, available_languages).
+    Fetches raw transcript segments, respecting original language auto-detection,
+    preferred language preference, and returns:
+    (raw_segments, language_name, language_code, is_generated, available_languages, track_object)
     """
     try:
         api = YouTubeTranscriptApi()
@@ -180,9 +214,8 @@ def fetch_raw_transcript(
     except Exception as e:
         raise YouTubeError(f"Unable to retrieve captions: {str(e)}", "RETRIEVAL_FAILED", 500)
 
-    # Collect available languages list
-    available_languages: List[TranscriptLanguage] = []
     track_list = list(transcript_list)
+    available_languages: List[TranscriptLanguage] = []
     for t in track_list:
         available_languages.append(
             TranscriptLanguage(
@@ -198,8 +231,8 @@ def fetch_raw_transcript(
 
     target_track = None
 
-    # 1. If preferred language requested, check exact or prefix match
-    if preferred_language:
+    # If user provided a specific language code (other than 'auto')
+    if preferred_language and preferred_language.lower() != "auto":
         pref = preferred_language.lower().strip()
         # Look for manual exact match
         for t in track_list:
@@ -218,42 +251,10 @@ def fetch_raw_transcript(
                 if t.language_code.lower().startswith(pref):
                     target_track = t
                     break
-        # Look for translatable track
-        if not target_track:
-            for t in track_list:
-                if t.is_translatable:
-                    try:
-                        translated = t.translate(pref)
-                        target_track = translated
-                        break
-                    except Exception:
-                        pass
 
-    # 2. If no preferred language or preferred was not found, apply sensible defaults:
+    # If no specific preferred language or preferred was 'auto', detect original language track!
     if not target_track:
-        # Prefer manual English
-        for t in track_list:
-            if not t.is_generated and t.language_code.lower().startswith("en"):
-                target_track = t
-                break
-
-    if not target_track:
-        # Prefer auto-generated English
-        for t in track_list:
-            if t.is_generated and t.language_code.lower().startswith("en"):
-                target_track = t
-                break
-
-    if not target_track:
-        # Prefer first manual transcript of any language
-        for t in track_list:
-            if not t.is_generated:
-                target_track = t
-                break
-
-    if not target_track:
-        # Fall back to first available transcript
-        target_track = track_list[0]
+        target_track = detect_original_track(track_list)
 
     try:
         fetched = target_track.fetch()
@@ -261,6 +262,33 @@ def fetch_raw_transcript(
         lang_name = getattr(target_track, "language", "Unknown")
         lang_code = getattr(target_track, "language_code", "unknown")
         is_gen = getattr(target_track, "is_generated", False)
-        return raw_data, lang_name, lang_code, is_gen, available_languages
+        return raw_data, lang_name, lang_code, is_gen, available_languages, target_track
     except Exception as e:
         raise YouTubeError(f"Failed to fetch subtitle content: {str(e)}", "FETCH_FAILED", 500)
+
+
+def try_youtube_translate_track(track_object: Any, target_language: str) -> Optional[List[dict]]:
+    """
+    Attempts to use YouTube's built-in translation on the track object if supported.
+    Returns raw segments if successful, or None if unsupported/unavailable.
+    """
+    if not track_object or not getattr(track_object, "is_translatable", False):
+        return None
+
+    try:
+        # Check if target_language is in supported translation languages
+        trans_langs = getattr(track_object, "translation_languages", [])
+        target_clean = target_language.lower().strip()
+        is_supported = any(
+            getattr(tl, "language_code", "").lower() == target_clean or
+            getattr(tl, "language_code", "").lower().startswith(target_clean)
+            for tl in trans_langs
+        )
+        if not is_supported:
+            return None
+
+        translated_track = track_object.translate(target_language)
+        fetched = translated_track.fetch()
+        return fetched.to_raw_data()
+    except (TranslationLanguageNotAvailable, Exception):
+        return None

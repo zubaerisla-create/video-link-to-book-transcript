@@ -1,47 +1,48 @@
-# Transcriptly — YouTube Transcript Extractor
+# Transcriptly — Multilingual YouTube Transcript Extractor & Translator
 
-**Transcriptly** is a minimal, elegant, production-quality web application that extracts accessible captions and subtitles from YouTube video links and organizes them into readable, human-friendly paragraphs.
+**Transcriptly** is a minimal, elegant, production-quality web application that extracts accessible captions, generates speech recognition transcripts using local `faster-whisper`, and performs multilingual translation.
 
-Built to run locally on Linux Mint without requiring any paid API keys.
+Built to run locally on Linux Mint without requiring paid API keys.
 
 ---
 
 ## Table of Contents
 
-1. [Features](#features)
+1. [Key Features](#key-features)
 2. [Design System & Palette](#design-system--palette)
 3. [Architecture & Tech Stack](#architecture--tech-stack)
 4. [Project Structure](#project-structure)
-5. [Prerequisites](#prerequisites)
+5. [Prerequisites & System Setup](#prerequisites--system-setup)
 6. [Local Installation & Setup](#local-installation--setup)
-   - [Backend Setup (FastAPI)](#1-backend-setup-fastapi)
+   - [Backend Setup (FastAPI & Whisper)](#1-backend-setup-fastapi)
    - [Frontend Setup (Next.js)](#2-frontend-setup-nextjs)
 7. [Running the Application](#running-the-application)
-8. [API Documentation](#api-documentation)
-9. [Transcript Formatting Engine](#transcript-formatting-engine)
+8. [Language & Translation Architecture](#language--translation-architecture)
+   - [Automatic Original-Language Mode](#automatic-original-language-mode)
+   - [Translation Mode & Alignment](#translation-mode--alignment)
+   - [Local Speech-to-Text Fallback (faster-whisper)](#local-speech-to-text-fallback-faster-whisper)
+9. [API Documentation](#api-documentation)
 10. [Testing & Verification](#testing--verification)
-11. [Privacy & Security](#privacy--security)
-12. [Troubleshooting](#troubleshooting)
+11. [Privacy, Security & Clean-up](#privacy-security--clean-up)
+12. [Troubleshooting & Hardware Considerations](#troubleshooting--hardware-considerations)
 
 ---
 
-## Features
+## Key Features
 
-- **Universal Link Support**: Accepts standard watch links (`youtube.com/watch?v=...`), shortened links (`youtu.be/...`), YouTube Shorts (`youtube.com/shorts/...`), and embed URLs (`youtube.com/embed/...`).
-- **Clean Paragraph Merging**: Intelligent sentence boundary and pause-gap grouping transforms fragmented rolling captions into smooth, natural paragraphs while strictly preserving 100% of the speaker's original words.
-- **Configurable Paragraph Length**: Switch between Short (~50 words), Medium (~100 words), and Long (~180 words) paragraph layouts on the fly.
-- **Dual View Modes**:
-  - **Paragraphs**: Formatted for reading, note-taking, and studying.
-  - **Timestamped Segments**: Reversible view displaying every segment with timestamp tags.
-- **In-Transcript Search**: Quickly find terms and phrases in extracted transcripts with live keyword filtering.
-- **Instant Exports**:
-  - **Copy All**: One-click clipboard copy with feedback.
-  - **TXT**: Clean plain-text download with title, URL, and metadata header.
-  - **JSON**: Full structured export with raw segments, start offsets, and durations.
-  - **SRT**: SubRip subtitle format with millisecond timecodes (`00:00:01,360 --> 00:00:03,040`).
-- **Multi-Language Tracks**: Detects all available creator-uploaded and auto-generated subtitle languages with in-app track switching.
-- **Zero Database / Zero Storage**: Ephemeral client-side session state. No video URLs or transcripts are logged to databases.
-- **No Paid API Keys**: Uses YouTube's official caption streams and oEmbed endpoints directly.
+- **Automatic Original-Language Mode (Default)**: Automatically detects the video's original spoken language (e.g. Bangla, English, Hindi, Arabic, Urdu, Spanish, French). Preserves the original script and phrasing without unintended automated translation.
+- **Multilingual Translation Mode**: Translate transcripts into Bangla (`bn`), English (`en`), Hindi (`hi`), Arabic (`ar`), Urdu (`ur`), Spanish (`es`), French (`fr`), and more.
+- **Side-by-Side & Aligned Views**: View original text and translated text aligned by timestamp or read as cohesive paragraphs.
+- **Local Speech-to-Text Fallback (`faster-whisper`)**: When captions are disabled or unavailable, optionally transcribe audio directly on CPU using local Whisper inference without sending data to paid APIs.
+- **Clean Paragraph Merging**: Sentence boundary detection across Latin, Bengali (dari `।`), Devanagari (`।`), and Arabic/Urdu (`؟`, `۔`) scripts groups fragmented captions into flowing paragraphs.
+- **Configurable Paragraph Length**: Switch between Short (~50 words), Medium (~100 words), and Long (~180 words) layouts dynamically.
+- **Dual Formats & In-Transcript Search**: Toggle between Paragraphs and Timestamped Segments, with real-time keyword search.
+- **Comprehensive Exports**:
+  - **Copy All**: Copies active view or side-by-side comparison to clipboard.
+  - **TXT**: Plain-text export with metadata headers.
+  - **JSON**: Full structured data including original segments, translated segments, timecodes, and metadata.
+  - **SRT**: SubRip format with millisecond timecodes (`00:00:01,360 --> 00:00:03,040`).
+- **Zero Database / Zero Storage**: Ephemeral processing. Transcripts are maintained in client state; temporary audio files from speech recognition are purged immediately after processing.
 
 ---
 
@@ -70,15 +71,22 @@ Designed around an editorial, calm, and uncluttered aesthetic:
 ## Architecture & Tech Stack
 
 ```
-[ Browser / Next.js Client ]  <--- JSON / HTTP --->  [ FastAPI Backend ]
-      App Router (React 19)                             Python 3.12
-      Tailwind CSS                                      youtube-transcript-api
-      Lucide Icons                                      YouTube oEmbed
-      Zod Validation                                    Paragraph Formatter
+[ Browser / Next.js Client ]
+      App Router (React 19)
+      Tailwind CSS + Lucide Icons
+      Original / Translate / Side-by-Side Views
+             │
+             │ JSON / HTTP (REST)
+             ▼
+[ FastAPI Backend (Python 3.12) ]
+  ├── YouTube Service (youtube-transcript-api, oEmbed)
+  ├── Speech Service (faster-whisper, yt-dlp, FFmpeg)
+  ├── Translation Service (YouTube captions, MyMemory)
+  └── Formatter Service (multilingual sentence grouping & SRT)
 ```
 
 - **Frontend**: Next.js 16 (App Router), TypeScript, Tailwind CSS, Lucide React, Zod.
-- **Backend**: FastAPI, Uvicorn, Python 3.12, `youtube-transcript-api`, `httpx`, Pydantic v2.
+- **Backend**: FastAPI, Uvicorn, Python 3.12, `youtube-transcript-api`, `faster-whisper`, `yt-dlp`, `imageio-ffmpeg`, `deep-translator`, `httpx`, Pydantic v2.
 - **Storage**: Client-side React state.
 
 ---
@@ -90,9 +98,9 @@ video-link-to-transcript/
 ├── client/                      # Next.js frontend application
 │   ├── app/
 │   │   ├── layout.tsx           # Root layout with Inter font, Navbar & Footer
-│   │   ├── page.tsx             # Home: Hero, URL card, metrics, and transcript view
+│   │   ├── page.tsx             # Home: URL card, language selector, side-by-side view
 │   │   ├── how-it-works/
-│   │   │   └── page.tsx         # Educational overview & caption comparisons
+│   │   │   └── page.tsx         # Educational guide & speech-to-text details
 │   │   ├── about/
 │   │   │   └── page.tsx         # Mission, privacy policy, and limitations
 │   │   └── globals.css          # Tailwind theme & design system colors
@@ -113,14 +121,17 @@ video-link-to-transcript/
 │   │   ├── schemas/
 │   │   │   └── transcript.py    # Pydantic models for request and response validation
 │   │   ├── services/
-│   │   │   ├── youtube_service.py   # URL parsing, oEmbed metadata, caption extraction
-│   │   │   └── formatter_service.py # Paragraph grouping, deduplication, SRT generator
-│   │   ├── config.py            # CORS origins, host, port, rate limiting
+│   │   │   ├── youtube_service.py     # Caption discovery, track translation, original detection
+│   │   │   ├── speech_service.py      # faster-whisper local speech recognition & audio stream
+│   │   │   ├── translation_service.py # Modular translation provider & segment alignment
+│   │   │   └── formatter_service.py   # Paragraph grouping, deduplication, SRT generator
+│   │   ├── config.py            # CORS origins, host, port, whisper settings
 │   │   └── main.py              # FastAPI application, rate limiter, global error handler
 │   ├── tests/
-│   │   ├── test_url_extraction.py   # URL & Video ID regex tests
-│   │   ├── test_formatter.py        # Paragraph merging and SRT generator tests
-│   │   └── test_api.py              # FastAPI endpoint tests
+│   │   ├── test_url_extraction.py               # URL & Video ID regex tests
+│   │   ├── test_formatter.py                    # Paragraph merging and SRT generator tests
+│   │   ├── test_multilingual_and_translation.py # Bangla, translation, alignment, fallback tests
+│   │   └── test_api.py                          # FastAPI endpoint tests
 │   ├── requirements.txt         # Pinned Python package dependencies
 │   ├── .env.example             # Backend environment variables template
 │   └── venv/                    # Isolated Python virtual environment
@@ -129,12 +140,13 @@ video-link-to-transcript/
 
 ---
 
-## Prerequisites
+## Prerequisites & System Setup
 
-- **OS**: Linux Mint (or any modern Linux distribution / macOS)
+- **OS**: Linux Mint (or Ubuntu / Debian / macOS / modern Linux)
 - **Node.js**: v20+ (`node -v`)
 - **npm**: v10+ (`npm -v`)
 - **Python**: 3.10+ with `python3-venv` (`python3 --version`)
+- **FFmpeg**: Bundled automatically via `imageio-ffmpeg` in the virtual environment. Alternatively, standard system FFmpeg (`sudo apt install ffmpeg`) can be used if available.
 
 ---
 
@@ -142,28 +154,35 @@ video-link-to-transcript/
 
 ### 1. Backend Setup (FastAPI)
 
-1. Open a terminal in the project directory:
+1. Navigate to the project root:
    ```bash
-   cd /home/abdullah/project/video-link-to-transcript/server
+   cd /home/abdullah/project/video-link-to-transcript
    ```
-2. Create and activate a dedicated virtual environment:
+2. Activate or create the Python virtual environment:
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate
+   python3 -m venv server/venv
+   source server/venv/bin/activate
    ```
 3. Install dependencies:
    ```bash
    pip install --upgrade pip
-   pip install -r requirements.txt
+   pip install -r server/requirements.txt
    ```
-4. Configure environment variables (optional, sensible defaults included):
+4. Copy the environment configuration:
    ```bash
-   cp .env.example .env
+   cp server/.env.example server/.env
    ```
+   Key environment variables in `server/.env`:
+   - `WHISPER_MODEL_SIZE`: Model size for speech recognition (`tiny`, `base`, `small`, `medium`). Default: `tiny`.
+   - `WHISPER_DEVICE`: Inference device (`cpu` or `cuda`). Default: `cpu`.
+   - `WHISPER_COMPUTE_TYPE`: Precision (`int8` or `float32`). Default: `int8`.
+   - `ENABLE_SPEECH_RECOGNITION`: Set `true` to permit faster-whisper fallback. Default: `true`.
+   - `SPEECH_MAX_VIDEO_DURATION_SECONDS`: Maximum video duration for local transcription (default: `1800` = 30 minutes).
+   - `AUDIO_TEMP_DIR`: Directory for temporary audio files (default: `/tmp/transcriptly_audio`).
 
 ### 2. Frontend Setup (Next.js)
 
-1. Open another terminal in the `client` directory:
+1. Open a terminal in the `client` directory:
    ```bash
    cd /home/abdullah/project/video-link-to-transcript/client
    ```
@@ -192,8 +211,8 @@ cd /home/abdullah/project/video-link-to-transcript
 source server/venv/bin/activate
 uvicorn server.app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-The FastAPI backend will start at `http://localhost:8000`.
-- API documentation (Swagger UI): `http://localhost:8000/docs`
+- API Base: `http://localhost:8000`
+- Interactive OpenAPI Docs: `http://localhost:8000/docs`
 - Health check: `http://localhost:8000/api/health`
 
 ### 2. Start the Frontend Server
@@ -206,27 +225,43 @@ Open your browser at `http://localhost:3000` (or `http://localhost:3001` if port
 
 ---
 
+## Language & Translation Architecture
+
+### Automatic Original-Language Mode
+- **Zero Alteration**: When "Original Language" is selected (default), Transcriptly retrieves the video's original spoken caption track.
+- **Accurate Detection**: If auto-generated captions exist (`is_generated=True`), its language code indicates the true spoken language of the video. If the creator uploaded a manual transcript in that same language, Transcriptly selects that manual track for superior punctuation.
+- **Preserved Scripts**: Bangla remains in Bengali script (`বাংলা`), Hindi in Devanagari (`हिन्दी`), Arabic in Arabic script (`العربية`), Urdu in Nastaliq/Urdu script (`اردو`).
+
+### Translation Mode & Alignment
+- **Target Selection**: Users can translate transcripts to Bangla, English, Hindi, Arabic, Urdu, Spanish, French, and more.
+- **Segment-Level Alignment**: Segments are translated while preserving original `start` and `duration` timestamps.
+- **Side-by-Side View**: Users can view the original text alongside the translated text simultaneously in both Paragraph and Timestamped modes.
+- **Modular Providers**:
+  1. *YouTube Caption Track Translation*: Used when the video track natively supports translation to the target language.
+  2. *Modular Provider (MyMemory)*: Fast batched newline translation supporting 100+ languages without paid API tokens.
+
+### Local Speech-to-Text Fallback (faster-whisper)
+- **Automatic Fallback**: If a public video has no captions available and the user enables the speech-to-text fallback checkbox, Transcriptly downloads the audio stream using `yt-dlp` and processes it locally using `faster-whisper`.
+- **CPU-Friendly**: Defaults to the lightweight `tiny` model with `int8` quantization. Runs smoothly on standard CPU hardware without GPU requirements.
+- **Automatic Cleanup**: Temporary audio files are strictly deleted in a `finally` block immediately after transcription completes.
+
+---
+
 ## API Documentation
 
 ### 1. `GET /api/health`
-Checks backend service availability.
-- **Response `200 OK`**:
-  ```json
-  {
-    "status": "healthy",
-    "service": "Transcriptly API",
-    "version": "1.0.0"
-  }
-  ```
+Returns API health, version, and feature capabilities.
 
 ### 2. `POST /api/transcript`
-Extracts captions and groups them into readable paragraphs.
+Extracts, formats, and optionally translates transcripts.
 - **Request Body**:
   ```json
   {
     "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    "language": "en",
-    "paragraph_length": "medium"
+    "language_mode": "translate",
+    "target_language": "bn",
+    "paragraph_length": "medium",
+    "enable_speech_fallback": true
   }
   ```
 - **Response `200 OK`**:
@@ -235,97 +270,72 @@ Extracts captions and groups them into readable paragraphs.
     "video_id": "dQw4w9WgXcQ",
     "video_info": {
       "video_id": "dQw4w9WgXcQ",
-      "title": "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)",
+      "title": "Rick Astley - Never Gonna Give You Up",
       "author": "Rick Astley",
       "thumbnail_url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
     },
-    "language": "en",
-    "language_name": "English",
+    "language": "bn",
+    "language_name": "Bangla",
+    "detected_language": "en",
+    "detected_language_name": "English",
     "is_generated": false,
-    "available_languages": [
-      {
-        "code": "en",
-        "name": "English",
-        "is_generated": false,
-        "is_translatable": true
-      }
-    ],
+    "transcription_method": "youtube_captions",
+    "language_mode": "translate",
+    "target_language": "bn",
+    "target_language_name": "Bangla",
+    "is_translated": true,
+    "translation_provider": "mymemory",
     "paragraphs": [
-      "We're no strangers to love. You know the rules and so do I...",
-      "A full commitment's what I'm thinking of..."
+      "আমরা প্রেমের অপরিচিত নই। আপনি নিয়ম জানেন এবং আমিও..."
     ],
     "segments": [
+      {"text": "আমরা প্রেমের অপরিচিত নই।", "start": 18.64, "duration": 3.24}
+    ],
+    "original_paragraphs": [
+      "We're no strangers to love. You know the rules and so do I..."
+    ],
+    "original_segments": [
       {"text": "We're no strangers to love.", "start": 18.64, "duration": 3.24}
     ],
-    "srt": "1\n00:00:18,640 --> 00:00:21,880\nWe're no strangers to love.\n",
-    "word_count": 428,
-    "character_count": 1971
+    "srt": "1\n00:00:18,640 --> 00:00:21,880\nআমরা প্রেমের অপরিচিত নই।\n",
+    "original_srt": "1\n00:00:18,640 --> 00:00:21,880\nWe're no strangers to love.\n",
+    "word_count": 420,
+    "character_count": 1890,
+    "warnings": []
   }
   ```
-
-### 3. `GET /api/transcript/languages?video_id=VIDEO_ID`
-Lists all available manual and auto-generated subtitle tracks for a given video ID or link.
-
-### 4. `GET /api/video-info?video_id=VIDEO_ID`
-Returns verified video title, author channel, and thumbnail from YouTube oEmbed without requiring an API key.
-
----
-
-## Transcript Formatting Engine
-
-Raw subtitle streams are fragmented into incomplete 1–3 second pieces:
-```
-"Not because I doubted myself, but"
-"because I was told that I wasn't good"
-"enough. I was told that I didn't fit in."
-```
-
-Transcriptly's formatting engine:
-1. **HTML entity unescaping & sanitization**: Resolves `&amp;`, `&#39;`, NBSP, and irregular linebreaks.
-2. **Rolling duplicate suppression**: Strips repeated phrase overlaps between rolling caption segments.
-3. **Punctuation & sentence boundary detection**: Identifies periods, exclamation marks, and question marks to preserve logical cadence.
-4. **Speaker pause analysis**: Measures timing gaps between consecutive segments (`start - last_end_time >= pause_threshold`). Pauses exceeding 2 seconds indicate a natural break or topic transition.
-5. **Configurable length constraints**:
-   - `short`: Targets ~50 words per paragraph.
-   - `medium`: Targets ~100 words per paragraph.
-   - `long`: Targets ~180 words per paragraph.
-6. **Zero hallucination guarantee**: No words are altered, omitted, or fabricated.
 
 ---
 
 ## Testing & Verification
 
-### Running Backend Unit Tests
 Run the comprehensive pytest suite:
 ```bash
 cd /home/abdullah/project/video-link-to-transcript
 server/venv/bin/pytest server/tests -v
 ```
-All 16 unit tests test:
-- YouTube URL formats (watch, youtu.be, shorts, embeds, direct IDs, invalid strings).
-- Text sanitization, overlap removal, SRT timecode formatting, paragraph merging.
-- FastAPI endpoints with mocked caption streams and error handlers.
 
-### Running Client Build Verification
-```bash
-cd /home/abdullah/project/video-link-to-transcript/client
-npm run build
-```
+All 23 unit and integration tests verify:
+- Original spoken language preservation for Bangla, English, Hindi, Arabic, Urdu.
+- Formatting of Indic dari (`।`) and Arabic/Urdu (`؟`, `۔`) terminal punctuation.
+- Translation to Bangla, Hindi, and English targets with segment alignment.
+- Local speech recognition fallback invocation when captions are absent.
+- Graceful 404 error responses with actionable guidance when captions are absent and fallback is disabled.
+- URL extraction for all YouTube formats (watch, `youtu.be`, Shorts, embeds).
 
 ---
 
-## Privacy & Security
+## Privacy, Security & Clean-up
 
-- **No Data Persistence**: Transcripts are processed in-memory and held in client-side state.
-- **Server-Side Validation**: All URLs are validated and sanitized server-side; arbitrary URLs or SSRF attempts are rejected.
-- **Rate Limiting**: In-memory sliding window rate limiter protects endpoints from abusive automated loops.
-- **No Traceback Exposure**: Unhandled exceptions return safe structured JSON errors (`{ "detail": "...", "code": "..." }`) rather than Python stack traces.
-- **Legitimate Access Only**: Accesses only publicly available captions using standard YouTube streams; private or restricted videos without captions are gracefully reported.
+- **Zero Database / Zero User Storage**: Transcripts and video URLs are never persisted to a database.
+- **Local Audio Clean-up**: Audio files downloaded during speech recognition fallback are stored in `/tmp/transcriptly_audio/` and unlinked immediately in a `finally` block.
+- **Server-Side Validation**: All URLs are validated before processing. Arbitrary URLs and SSRF attempts are rejected.
+- **Safe Error Responses**: Unhandled exceptions return structured JSON errors without exposing Python stack traces.
 
 ---
 
-## Troubleshooting
+## Troubleshooting & Hardware Considerations
 
-- **"No accessible captions found"**: The video owner did not upload subtitles and YouTube did not generate automatic captions. Try another video with captions enabled.
-- **"YouTube caption access is temporarily rate-limited"**: YouTube occasionally throttles high-frequency IP requests. Wait a short moment and retry.
-- **"Port 3000 is in use"**: If port 3000 is occupied by another application, Next.js will automatically bind to port 3001. The backend CORS configuration permits both `http://localhost:3000` and `http://localhost:3001`.
+- **CPU vs GPU**: `faster-whisper` defaults to `device="cpu"` and `compute_type="int8"` for zero-configuration compatibility on Linux Mint laptops and desktops without dedicated GPUs. If a CUDA GPU is available, set `WHISPER_DEVICE=cuda` and `WHISPER_COMPUTE_TYPE=float16` in `server/.env`.
+- **Model Size**: The `tiny` model (~75MB) loads within 2 seconds. For higher transcription accuracy on complex audio, you can set `WHISPER_MODEL_SIZE=base` or `WHISPER_MODEL_SIZE=small` in `server/.env`.
+- **FFmpeg**: Bundled static binary from `imageio-ffmpeg` is automatically detected and added to PATH at startup.

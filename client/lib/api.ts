@@ -1,4 +1,10 @@
-import { TranscriptResponse, TranscriptLanguage, VideoInfo, ParagraphLengthMode } from "./types";
+import {
+  TranscriptResponse,
+  TranscriptLanguage,
+  VideoInfo,
+  ParagraphLengthMode,
+  LanguageMode,
+} from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -47,11 +53,23 @@ export async function checkApiHealth(): Promise<{ status: string; version: strin
   return handleResponse(res);
 }
 
-export async function fetchTranscript(
-  url: string,
-  language?: string,
-  paragraphLength: ParagraphLengthMode = "medium"
-): Promise<TranscriptResponse> {
+export interface FetchTranscriptOptions {
+  url: string;
+  language?: string;
+  paragraphLength?: ParagraphLengthMode;
+  languageMode?: LanguageMode;
+  targetLanguage?: string;
+  enableSpeechFallback?: boolean;
+}
+
+export async function fetchTranscript({
+  url,
+  language,
+  paragraphLength = "medium",
+  languageMode = "original",
+  targetLanguage,
+  enableSpeechFallback = false,
+}: FetchTranscriptOptions): Promise<TranscriptResponse> {
   const res = await fetch(`${API_BASE_URL}/api/transcript`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -59,6 +77,9 @@ export async function fetchTranscript(
       url: url.trim(),
       language: language || undefined,
       paragraph_length: paragraphLength,
+      language_mode: languageMode,
+      target_language: targetLanguage || undefined,
+      enable_speech_fallback: enableSpeechFallback,
     }),
   });
 
