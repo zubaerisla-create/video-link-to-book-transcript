@@ -218,7 +218,7 @@ function HomePageContent() {
       } else {
         setError({
           message:
-            "Could not connect to the extraction service. Please ensure the backend is running locally on port 8000.",
+            "Could not connect to the transcript extraction service. Please check your internet connection and try again.",
           code: "NETWORK_ERROR",
         });
       }
@@ -469,7 +469,7 @@ function HomePageContent() {
   );
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 sm:py-12">
       {/* Hero Section */}
       <div className="text-center mb-8 sm:mb-10">
         <div className="inline-flex items-center rounded-full bg-[#FFF1B8] px-3.5 py-1 text-xs font-semibold tracking-wider text-[#292522] uppercase mb-4 border border-[#F0E8E2]">

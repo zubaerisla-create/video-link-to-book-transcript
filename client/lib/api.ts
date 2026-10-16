@@ -12,12 +12,18 @@ import {
   SaveBookPayload,
 } from "./types";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL !== undefined && process.env.NEXT_PUBLIC_API_URL !== ""
-    ? process.env.NEXT_PUBLIC_API_URL
-    : typeof window !== "undefined"
-    ? ""
-    : "http://127.0.0.1:8001";
+const getApiBaseUrl = (): string => {
+  if (typeof window !== "undefined") {
+    const custom = process.env.NEXT_PUBLIC_API_URL;
+    if (custom && custom.startsWith("https://") && !custom.includes("localhost")) {
+      return custom.replace(/\/$/, "");
+    }
+    return "";
+  }
+  return process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8001";
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export class ApiError extends Error {
   code: string;

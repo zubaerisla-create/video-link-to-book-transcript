@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FileText } from "lucide-react";
+import Image from "next/image";
 import { GithubIcon } from "@/components/GithubIcon";
 
 export function Footer() {
@@ -10,16 +10,22 @@ export function Footer() {
 
   return (
     <footer className="mt-auto border-t border-[#F0E8E2] bg-[#FFFDF8] pt-12 pb-8 sm:pt-16 sm:pb-10">
-      <div className="mx-auto max-w-5xl px-4 sm:px-6">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Main Footer Links */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           {/* Brand Col */}
           <div className="sm:col-span-2 md:col-span-1 space-y-3">
-            <Link href="/" className="flex items-center gap-2 group">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FFF1B8] border border-[#F0E8E2] text-[#292522]">
-                <FileText className="h-4 w-4" />
+            <Link href="/" className="flex items-center gap-2.5 group">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white border border-[#F0E8E2] text-[#292522] shadow-xs overflow-hidden p-1">
+                <Image
+                  src="/logo.png"
+                  alt="Transcriptly Logo"
+                  width={28}
+                  height={28}
+                  className="h-full w-full object-contain"
+                />
               </div>
-              <span className="font-bold text-base text-[#292522]">Transcriptly</span>
+              <span className="font-extrabold text-base text-[#292522]">Transcriptly</span>
             </Link>
             <p className="text-xs text-[#77716D] leading-relaxed">
               Transform messy YouTube captions into clean, readable text paragraphs, bilingual translations, and personal digital books.

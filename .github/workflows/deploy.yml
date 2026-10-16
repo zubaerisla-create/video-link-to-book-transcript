@@ -49,7 +49,8 @@ jobs:
         working-directory: client
         run: npm run build
         env:
-          NEXT_PUBLIC_API_URL: "http://localhost:8000"
+          NEXT_PUBLIC_API_URL: ""
+          NEXT_PUBLIC_SITE_URL: "https://habd.tech"
           NEXT_PUBLIC_GITHUB_URL: "https://github.com/zubaerisla-create"
 
   deploy:

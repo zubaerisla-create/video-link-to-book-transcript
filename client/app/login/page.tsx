@@ -2,6 +2,7 @@
 
 import React, { useState, Suspense } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LogIn, AlertCircle, ArrowRight, BookOpen, KeyRound } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -63,8 +64,14 @@ function LoginForm() {
       <div className="rounded-3xl border border-[#F0E8E2] bg-white p-6 sm:p-10 shadow-xs">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FFF1B8] border border-[#F0E8E2] text-[#292522]">
-            <BookOpen className="h-6 w-6 text-[#292522]" />
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white border border-[#F0E8E2] text-[#292522] shadow-xs p-1.5 overflow-hidden">
+            <Image
+              src="/logo.png"
+              alt="Transcriptly"
+              width={48}
+              height={48}
+              className="h-full w-full object-contain"
+            />
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#292522]">
             Welcome Back
