@@ -40,6 +40,10 @@ class Settings(BaseModel):
         "http://31.97.180.176:80",
         "http://31.97.180.176:8080",
         "http://31.97.180.176:3005",
+        "https://habd.tech",
+        "https://www.habd.tech",
+        "http://habd.tech",
+        "http://www.habd.tech",
     ] + [
         origin.strip()
         for origin in os.getenv("ADDITIONAL_CORS_ORIGINS", "").split(",")

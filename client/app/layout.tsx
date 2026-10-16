@@ -5,7 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { AuthProvider } from "@/lib/auth-context";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://transcriptly.net";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://habd.tech";
 const adsenseClientId = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
 
 export const metadata: Metadata = {
