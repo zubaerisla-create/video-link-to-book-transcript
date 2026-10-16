@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
@@ -7,6 +7,12 @@ import { AuthProvider } from "@/lib/auth-context";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://habd.tech";
 const adsenseClientId = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -76,6 +82,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
         {adsenseClientId && adsenseClientId.startsWith("ca-pub-") && (
           <>
             <meta name="google-adsense-account" content={adsenseClientId} />

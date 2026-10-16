@@ -2,6 +2,8 @@ export function GithubIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <svg
       className={className}
+      width="16"
+      height="16"
       fill="currentColor"
       viewBox="0 0 24 24"
       aria-hidden="true"
