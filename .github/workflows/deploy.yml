@@ -87,7 +87,7 @@ jobs:
             echo "📦 Updating Python backend..."
             server/venv/bin/pip install --upgrade pip
             server/venv/bin/pip install --no-cache-dir -r server/requirements.txt
-            PYTHONPATH=. server/venv/bin/python3 server/app/db/init_db.py || true
+            PYTHONPATH=. server/venv/bin/python3 server/app/db/database.py || true
 
             # Build Next.js frontend
             echo "🔨 Building frontend..."
