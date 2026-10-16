@@ -1,5 +1,6 @@
 import os
 import uuid
+import glob
 import asyncio
 import shutil
 import logging
@@ -80,41 +81,43 @@ def download_audio_stream(video_id: str) -> str:
 
     import yt_dlp
 
-    ydl_opts = {
-        "format": "bestaudio/best",
+    ydl_opts: Dict[str, Any] = {
+        "format": "bestaudio[ext=m4a]/bestaudio/best",
         "outtmpl": out_template,
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "128",
-            }
-        ],
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
-        # Restrict to public accessible formats without bypassing restrictions
     }
 
     try:
+        import imageio_ffmpeg
+        ffmpeg_bin = imageio_ffmpeg.get_ffmpeg_exe()
+        if ffmpeg_bin:
+            ydl_opts["ffmpeg_location"] = os.path.dirname(ffmpeg_bin)
+    except Exception:
+        pass
+
+    duration_error = None
+
+    def duration_filter(info_dict, *, incomplete):
+        nonlocal duration_error
+        dur = info_dict.get("duration")
+        if dur and dur > settings.SPEECH_MAX_VIDEO_DURATION_SECONDS:
+            max_mins = settings.SPEECH_MAX_VIDEO_DURATION_SECONDS // 60
+            duration_error = f"Video duration ({dur // 60} mins) exceeds the local speech recognition limit of {max_mins} minutes."
+            return duration_error
+        return None
+
+    ydl_opts["match_filter"] = duration_filter
+
+    try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # 1. Extract metadata first to check duration
-            info = ydl.extract_info(video_url, download=False)
-            if not info:
-                raise SpeechRecognitionError("Video information could not be retrieved", "VIDEO_UNAVAILABLE", 404)
-
-            duration = info.get("duration", 0)
-            if duration and duration > settings.SPEECH_MAX_VIDEO_DURATION_SECONDS:
-                max_mins = settings.SPEECH_MAX_VIDEO_DURATION_SECONDS // 60
-                raise SpeechRecognitionError(
-                    f"Video duration ({duration // 60} mins) exceeds the local speech recognition limit of {max_mins} minutes.",
-                    "DURATION_LIMIT_EXCEEDED",
-                    400
-                )
-
-            # 2. Download audio
-            ydl.download([video_url])
+            ydl.extract_info(video_url, download=True)
+            if duration_error:
+                raise SpeechRecognitionError(duration_error, "DURATION_LIMIT_EXCEEDED", 400)
     except yt_dlp.utils.DownloadError as e:
+        if duration_error:
+            raise SpeechRecognitionError(duration_error, "DURATION_LIMIT_EXCEEDED", 400)
         err_msg = str(e)
         if "Private video" in err_msg or "Sign in" in err_msg:
             raise SpeechRecognitionError(
@@ -128,19 +131,19 @@ def download_audio_stream(video_id: str) -> str:
     except Exception as e:
         raise SpeechRecognitionError(f"Audio extraction failed: {str(e)}", "AUDIO_EXTRACTION_FAILED", 500)
 
-    expected_file = os.path.join(settings.AUDIO_TEMP_DIR, f"{video_id}_{temp_id}.mp3")
-    if not os.path.exists(expected_file):
-        # Check if downloaded under another extension
-        for ext in ("m4a", "webm", "opus", "wav"):
-            alt = os.path.join(settings.AUDIO_TEMP_DIR, f"{video_id}_{temp_id}.{ext}")
-            if os.path.exists(alt):
-                return alt
+    # Locate downloaded file (m4a, webm, etc.)
+    pattern = os.path.join(settings.AUDIO_TEMP_DIR, f"{video_id}_{temp_id}.*")
+    matching_files = glob.glob(pattern)
+    if not matching_files or not os.path.exists(matching_files[0]):
         raise SpeechRecognitionError("Audio file was not produced after download", "AUDIO_EXTRACTION_FAILED", 500)
 
-    return expected_file
+    return matching_files[0]
 
 
-async def transcribe_youtube_audio(video_id: str) -> Tuple[List[dict], str, str]:
+async def transcribe_youtube_audio(
+    video_id: str,
+    preferred_language: Optional[str] = None,
+) -> Tuple[List[dict], str, str]:
     """
     Orchestrates local speech recognition via faster-whisper.
     Returns: (raw_segments, detected_language_name, detected_language_code)
@@ -163,14 +166,19 @@ async def transcribe_youtube_audio(video_id: str) -> Tuple[List[dict], str, str]
             # Step 2: Transcribe using cached faster-whisper model
             def _transcribe():
                 model = get_whisper_model()
-                # Auto-detect language
-                segments, info = model.transcribe(
-                    audio_path,
-                    beam_size=5,
-                    vad_filter=True,
-                    vad_parameters=dict(min_silence_duration_ms=500),
-                )
-                
+                transcribe_kwargs: Dict[str, Any] = {
+                    "beam_size": 5,
+                    "vad_filter": True,
+                    "vad_parameters": dict(min_silence_duration_ms=500),
+                }
+
+                if preferred_language and preferred_language.lower() != "auto":
+                    lang_hint = preferred_language.lower().split("-")[0]
+                    transcribe_kwargs["language"] = lang_hint
+                    logger.info("faster-whisper transcribing with language hint: '%s'", lang_hint)
+
+                segments, info = model.transcribe(audio_path, **transcribe_kwargs)
+
                 raw_segs = []
                 for s in segments:
                     clean = s.text.strip()
@@ -182,7 +190,14 @@ async def transcribe_youtube_audio(video_id: str) -> Tuple[List[dict], str, str]
                         })
 
                 lang_code = info.language or "unknown"
+                lang_prob = getattr(info, "language_probability", 0.0)
                 lang_name = get_language_display_name(lang_code)
+                logger.info(
+                    "faster-whisper recognized language '%s' (%s) with probability %.4f",
+                    lang_code,
+                    lang_name,
+                    lang_prob,
+                )
                 return raw_segs, lang_name, lang_code
 
             raw_segments, language_name, language_code = await loop.run_in_executor(None, _transcribe)
@@ -203,3 +218,4 @@ async def transcribe_youtube_audio(video_id: str) -> Tuple[List[dict], str, str]
                     os.remove(audio_path)
                 except Exception as e:
                     logger.warning(f"Could not remove temporary audio file {audio_path}: {e}")
+

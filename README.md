@@ -197,7 +197,7 @@ video-link-to-transcript/
    Default contents:
    ```env
    NEXT_PUBLIC_API_URL=http://localhost:8000
-   NEXT_PUBLIC_GITHUB_URL=https://github.com/your-username/transcriptly
+   NEXT_PUBLIC_GITHUB_URL=https://github.com/zubaerisla-create
    ```
 
 ---

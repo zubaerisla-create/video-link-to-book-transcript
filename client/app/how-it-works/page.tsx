@@ -1,9 +1,14 @@
-import { Link as LinkIcon, Subtitles, Download, Sparkles, AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Link as LinkIcon, Subtitles, Download, AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
-export const metadata = {
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
   title: "How It Works | Transcriptly",
   description: "Learn how Transcriptly extracts and formats YouTube captions into readable transcripts.",
+  alternates: {
+    canonical: "/how-it-works",
+  },
 };
 
 export default function HowItWorksPage() {
@@ -38,8 +43,7 @@ export default function HowItWorksPage() {
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-16">
       {/* Header section */}
       <div className="text-center mb-12 sm:mb-16">
-        <div className="inline-flex items-center gap-1.5 rounded-full bg-[#FFF1B8] px-3 py-1 text-xs font-semibold tracking-wider text-[#292522] uppercase mb-4 border border-[#F0E8E2]">
-          <Sparkles className="h-3.5 w-3.5 text-[#292522]" />
+        <div className="inline-flex items-center rounded-full bg-[#FFF1B8] px-3.5 py-1 text-xs font-semibold tracking-wider text-[#292522] uppercase mb-4 border border-[#F0E8E2]">
           <span>Workflow Overview</span>
         </div>
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#292522]">

@@ -61,3 +61,82 @@ export interface ApiErrorDetail {
 
 export type ParagraphLengthMode = "short" | "medium" | "long";
 export type LanguageMode = "original" | "translate";
+
+// --- Authentication Types ---
+export interface User {
+  id: string;
+  email: string;
+  full_name: string;
+  created_at: string;
+}
+
+export interface AuthResponse {
+  user: User;
+  token: string;
+  message: string;
+}
+
+// --- Digital Book & Library Types ---
+export interface BookSummary {
+  id: string;
+  title: string;
+  video_id: string;
+  video_url: string;
+  channel_title: string | null;
+  thumbnail_url: string | null;
+  duration_seconds: number | null;
+  language: string;
+  language_name: string;
+  detected_language: string;
+  is_translated: boolean;
+  target_language: string | null;
+  translation_provider: string | null;
+  word_count: number;
+  character_count: number;
+  reading_progress: number;
+  last_page_read: number;
+  total_pages: number;
+  reading_theme: "light" | "sepia" | "dark" | string;
+  font_size: "sm" | "md" | "lg" | "xl" | string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BookDetail extends BookSummary {
+  paragraphs: string[];
+  segments: TranscriptSegment[];
+  srt: string;
+  original_paragraphs?: string[] | null;
+  original_segments?: TranscriptSegment[] | null;
+  original_srt?: string | null;
+  translated_paragraphs?: string[] | null;
+  translated_segments?: TranscriptSegment[] | null;
+}
+
+export interface BookListResponse {
+  books: BookSummary[];
+  total_count: number;
+}
+
+export interface SaveBookPayload {
+  title: string;
+  video_id: string;
+  video_url: string;
+  channel_title?: string | null;
+  thumbnail_url?: string | null;
+  duration_seconds?: number | null;
+  language: string;
+  language_name: string;
+  detected_language: string;
+  is_translated: boolean;
+  target_language?: string | null;
+  translation_provider?: string | null;
+  paragraphs: string[];
+  segments: TranscriptSegment[];
+  srt: string;
+  original_paragraphs?: string[] | null;
+  original_segments?: TranscriptSegment[] | null;
+  original_srt?: string | null;
+  translated_paragraphs?: string[] | null;
+  translated_segments?: TranscriptSegment[] | null;
+}

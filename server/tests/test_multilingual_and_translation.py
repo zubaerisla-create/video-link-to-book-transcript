@@ -235,3 +235,164 @@ def test_unsupported_translation_language_pair():
     """Verify that requesting an unsupported target language code raises user-friendly error."""
     provider = translation_manager.providers["mymemory"]
     assert provider.is_language_supported("xyz123") is False
+
+
+def test_detect_script_language_inference():
+    """Verify detect_script_language correctly identifies Unicode script languages."""
+    from server.app.services.youtube_service import detect_script_language
+
+    assert detect_script_language("SSC ও HSC GPA অনুযায়ী কোন দেশে পড়তে পারবেন? | Study Abroad Guide") == "bn"
+    assert detect_script_language("পাইথন প্রোগ্রামিং শিখুন সহজে") == "bn"
+    assert detect_script_language("मशीन लर्निंग कैसे सीखें") == "hi"
+    assert detect_script_language("تعلم البرمجة للمبتدئين") == "ar"
+    assert detect_script_language("Learn Python for Beginners") is None
+    assert detect_script_language("") is None
+    assert detect_script_language(None) is None
+
+
+def test_detect_original_track_rejects_conflicting_english_auto_track_for_bangla_title():
+    """Verify that detect_original_track rejects YouTube's auto-generated 'en' track when title is Bengali."""
+    from server.app.services.youtube_service import detect_original_track
+
+    # Mock an auto-generated English caption track
+    mock_en_track = MagicMock()
+    mock_en_track.language_code = "en"
+    mock_en_track.language = "English (auto-generated)"
+    mock_en_track.is_generated = True
+
+    track_list = [mock_en_track]
+    bangla_title = "SSC ও HSC GPA অনুযায়ী কোন দেশে পড়তে পারবেন? | Study Abroad Guide"
+
+    # Should NOT return the English track; should return None so speech fallback can run!
+    selected = detect_original_track(track_list, video_title=bangla_title)
+    assert selected is None
+
+
+def test_detect_original_track_prioritizes_bangla_when_available():
+    """Verify that detect_original_track chooses the Bangla track when title is Bengali."""
+    from server.app.services.youtube_service import detect_original_track
+
+    mock_en_track = MagicMock()
+    mock_en_track.language_code = "en"
+    mock_en_track.is_generated = True
+
+    mock_bn_track = MagicMock()
+    mock_bn_track.language_code = "bn"
+    mock_bn_track.is_generated = False
+
+    track_list = [mock_en_track, mock_bn_track]
+    bangla_title = "SSC ও HSC GPA অনুযায়ী কোন দেশে পড়তে পারবেন? | Study Abroad Guide"
+
+    selected = detect_original_track(track_list, video_title=bangla_title)
+    assert selected == mock_bn_track
+
+
+@patch("server.app.api.routes.get_video_info")
+@patch("server.app.services.youtube_service.YouTubeTranscriptApi")
+@patch("server.app.api.routes.transcribe_youtube_audio")
+def test_bangla_video_with_only_english_captions_falls_back_to_whisper_bangla(
+    mock_speech_transcribe, mock_yt_api_cls, mock_get_video_info
+):
+    """
+    Regression test for video 4rWvW5ZRkNc:
+    A Bangla video where YouTube only offers an auto-generated English caption track.
+    In original mode, the app must reject the English track and transcribe the spoken Bangla.
+    """
+    mock_get_video_info.return_value = {
+        "video_id": "4rWvW5ZRkNc",
+        "title": "SSC ও HSC GPA অনুযায়ী কোন দেশে পড়তে পারবেন? | Study Abroad Guide",
+        "author": "Munzereen Shahid",
+        "thumbnail_url": "https://i.ytimg.com/vi/4rWvW5ZRkNc/hqdefault.jpg"
+    }
+
+    # YouTube API returns only auto-generated 'en' track
+    mock_en_track = MagicMock()
+    mock_en_track.language_code = "en"
+    mock_en_track.language = "English (auto-generated)"
+    mock_en_track.is_generated = True
+    mock_en_track.is_translatable = True
+
+    mock_api_instance = MagicMock()
+    mock_api_instance.list.return_value = [mock_en_track]
+    mock_yt_api_cls.return_value = mock_api_instance
+
+    # Mock Whisper speech recognition detecting Bangla
+    mock_speech_transcribe.return_value = (
+        [
+            {"text": "এসএসসি এবং এইচএসসি জিপিএ অনুযায়ী কোন কোন দেশে আপনি পড়াশোনা করতে পারবেন?", "start": 0.0, "duration": 4.5},
+            {"text": "আজকের ভিডিওতে আমরা বিস্তারিত আলোচনা করব।", "start": 4.6, "duration": 3.2},
+        ],
+        "Bangla",
+        "bn",
+    )
+
+    response = client.post(
+        "/api/transcript",
+        json={
+            "url": "https://youtu.be/4rWvW5ZRkNc",
+            "language_mode": "original",
+            "enable_speech_fallback": True,
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["transcription_method"] == "speech_recognition"
+    assert data["detected_language"] == "bn"
+    assert data["detected_language_name"] == "Bangla"
+    assert data["language"] == "bn"
+    assert data["is_translated"] is False
+    assert data["target_language"] is None
+    assert "এসএসসি এবং এইচএসসি" in data["paragraphs"][0]
+
+
+@patch("server.app.api.routes.get_video_info")
+@patch("server.app.services.youtube_service.YouTubeTranscriptApi")
+def test_english_original_mode_returns_english_captions_without_translating(
+    mock_yt_api_cls, mock_get_video_info
+):
+    """
+    Regression test for English original mode:
+    An English video with English captions returns English verbatim without translation.
+    """
+    mock_get_video_info.return_value = {
+        "video_id": "engVid99001",
+        "title": "Learn Python in 10 Minutes",
+        "author": "Tech Creator",
+        "thumbnail_url": None,
+    }
+
+    mock_en_track = MagicMock()
+    mock_en_track.language_code = "en"
+    mock_en_track.language = "English (auto-generated)"
+    mock_en_track.is_generated = True
+    mock_en_track.is_translatable = True
+
+    mock_raw_fetched = MagicMock()
+    mock_raw_fetched.to_raw_data.return_value = [
+        {"text": "Welcome to Python tutorial.", "start": 0.0, "duration": 2.5},
+        {"text": "Let us get started.", "start": 2.6, "duration": 2.0},
+    ]
+    mock_en_track.fetch.return_value = mock_raw_fetched
+
+    mock_api_instance = MagicMock()
+    mock_api_instance.list.return_value = [mock_en_track]
+    mock_yt_api_cls.return_value = mock_api_instance
+
+    response = client.post(
+        "/api/transcript",
+        json={
+            "url": "https://www.youtube.com/watch?v=engVid99001",
+            "language_mode": "original",
+            "enable_speech_fallback": False,
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["transcription_method"] == "youtube_captions"
+    assert data["detected_language"] == "en"
+    assert data["language"] == "en"
+    assert data["is_translated"] is False
+    assert "Welcome to Python tutorial." in data["paragraphs"][0]
+

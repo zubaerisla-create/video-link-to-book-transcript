@@ -1,5 +1,6 @@
 import re
 import urllib.parse
+import logging
 from typing import Optional, List, Tuple, Any
 import httpx
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -89,8 +90,8 @@ def extract_video_id(url_or_id: str) -> str:
             if re.fullmatch(r"[a-zA-Z0-9_-]{11}", video_id):
                 return video_id
 
-    # youtube.com/shorts/VIDEO_ID or youtube.com/embed/VIDEO_ID or youtube.com/v/VIDEO_ID
-    match = re.match(r"^/(shorts|embed|v)/([a-zA-Z0-9_-]{11})", parsed.path)
+    # youtube.com/shorts/VIDEO_ID, /embed/VIDEO_ID, /live/VIDEO_ID, or /v/VIDEO_ID
+    match = re.match(r"^/(shorts|embed|v|live)/([a-zA-Z0-9_-]{11})", parsed.path)
     if match:
         return match.group(2)
 
@@ -155,43 +156,144 @@ def list_transcript_languages(video_id: str) -> List[TranscriptLanguage]:
         raise YouTubeError(f"Failed to list caption tracks: {str(e)}", "CAPTIONS_ERROR", 500)
 
 
-def detect_original_track(track_list: List[Any]) -> Any:
+logger = logging.getLogger("transcriptly.youtube")
+
+
+def detect_script_language(text: Optional[str]) -> Optional[str]:
     """
-    Identifies the video's original spoken language caption track.
-    - If an auto-generated track is present, its language represents the video's true spoken language.
-      If a creator-uploaded manual track exists in that same language, prefer the manual track.
-      Otherwise, use the auto-generated track.
-    - If no auto-generated track exists, prefer the first manual track.
-    - Fall back to the first available track.
+    Infers likely language from non-Latin Unicode scripts in the title or text.
+    Returns language code (e.g. 'bn', 'hi', 'ar', 'ur', etc.) or None if ambiguous / Latin.
+    """
+    if not text or not isinstance(text, str):
+        return None
+
+    # Bengali / Bangla: U+0980 - U+09FF
+    if re.search(r"[\u0980-\u09FF]", text):
+        return "bn"
+    # Devanagari (Hindi): U+0900 - U+097F
+    if re.search(r"[\u0900-\u097F]", text):
+        return "hi"
+    # Urdu-specific characters check before generic Arabic
+    if re.search(r"[\u0679\u0686\u0698\u0695\u06BA\u06BE\u06C1\u06D2]", text):
+        return "ur"
+    # Arabic: U+0600 - U+06FF, U+0750 - U+077F
+    if re.search(r"[\u0600-\u06FF\u0750-\u077F]", text):
+        return "ar"
+    # Japanese (Hiragana / Katakana): U+3040 - U+30FF
+    if re.search(r"[\u3040-\u309F\u30A0-\u30FF]", text):
+        return "ja"
+    # Korean (Hangul): U+AC00 - U+D7AF, U+1100 - U+11FF
+    if re.search(r"[\uAC00-\uD7AF\u1100-\u11FF]", text):
+        return "ko"
+    # Chinese (CJK Unified): U+4E00 - U+9FFF
+    if re.search(r"[\u4E00-\u9FFF]", text):
+        return "zh"
+    # Cyrillic (Russian, etc.): U+0400 - U+04FF
+    if re.search(r"[\u0400-\u04FF]", text):
+        return "ru"
+    # Tamil: U+0B80 - U+0BFF
+    if re.search(r"[\u0B80-\u0BFF]", text):
+        return "ta"
+    # Telugu: U+0C00 - U+0C7F
+    if re.search(r"[\u0C00-\u0C7F]", text):
+        return "te"
+    # Malayalam: U+0D00 - U+0D7F
+    if re.search(r"[\u0D00-\u0D7F]", text):
+        return "ml"
+    # Kannada: U+0C80 - U+0CFF
+    if re.search(r"[\u0C80-\u0CFF]", text):
+        return "kn"
+    # Gujarati: U+0A80 - U+0AFF
+    if re.search(r"[\u0A80-\u0AFF]", text):
+        return "gu"
+    # Gurmukhi (Punjabi): U+0A00 - U+0A7F
+    if re.search(r"[\u0A00-\u0A7F]", text):
+        return "pa"
+    # Thai: U+0E00 - U+0E7F
+    if re.search(r"[\u0E00-\u0E7F]", text):
+        return "th"
+
+    return None
+
+
+def detect_original_track(track_list: List[Any], video_title: Optional[str] = None) -> Any:
+    """
+    Identifies the video's original spoken language caption track by inspecting all available tracks.
+    Does not infer original language solely from the first available track.
+    
+    1. If video title exhibits a distinctive script (e.g. Bengali, Devanagari, Arabic):
+       - Prioritizes manual tracks matching that script's language code.
+       - Then checks auto-generated tracks matching that script's language code.
+       - If no tracks match the script and the only available track is an auto-generated
+         track in a conflicting language (e.g. auto 'en' on a Bangla-titled video), returns None
+         so caller can fall back to speech recognition rather than serving erroneous captions.
+    2. If creator-uploaded manual tracks exist:
+       - Check if an auto-generated track matches one of the manual tracks (indicates native speech).
+       - Otherwise prefers the primary creator-uploaded manual track.
+    3. If only auto-generated tracks exist and no script conflict:
+       - Returns the auto-generated track.
     """
     if not track_list:
         return None
 
-    # Check for auto-generated track (YouTube speech-recognition detected language)
+    title_lang = detect_script_language(video_title)
+    if title_lang:
+        # Check for manual creator track matching title language
+        for t in track_list:
+            t_code = getattr(t, "language_code", "").lower()
+            if not getattr(t, "is_generated", False) and (t_code == title_lang or t_code.startswith(f"{title_lang}-")):
+                logger.info("Matched manual creator caption track for title language '%s': %s", title_lang, t_code)
+                return t
+
+        # Check for auto-generated track matching title language
+        for t in track_list:
+            t_code = getattr(t, "language_code", "").lower()
+            if getattr(t, "is_generated", False) and (t_code == title_lang or t_code.startswith(f"{title_lang}-")):
+                logger.info("Matched auto-generated caption track for title language '%s': %s", title_lang, t_code)
+                return t
+
+        # Title is in a specific non-Latin script, but no track matches that language.
+        # If available tracks are only auto-generated tracks in another language (e.g., 'en'),
+        # this is a known YouTube auto-caption misclassification anomaly.
+        only_generated = all(getattr(t, "is_generated", False) for t in track_list)
+        if only_generated:
+            logger.warning(
+                "Video title script indicates '%s', but available tracks (%s) do not contain '%s'. "
+                "Auto-generated tracks conflict with title script. Declaring original captions unavailable.",
+                title_lang,
+                [getattr(t, "language_code", "") for t in track_list],
+                title_lang,
+            )
+            return None
+
+    # If title script did not match, check manual vs auto-generated tracks
     auto_track = next((t for t in track_list if getattr(t, "is_generated", False)), None)
     if auto_track:
-        auto_lang = getattr(auto_track, "language_code", "").lower()
-        # Look for a creator-uploaded manual track in that exact language
+        auto_lang = getattr(auto_track, "language_code", "").lower().split("-")[0]
+        # Look for a creator-uploaded manual track in that same language
         matching_manual = next(
-            (t for t in track_list if not getattr(t, "is_generated", False) and getattr(t, "language_code", "").lower() == auto_lang),
+            (t for t in track_list if not getattr(t, "is_generated", False) and getattr(t, "language_code", "").lower().split("-")[0] == auto_lang),
             None
         )
         if matching_manual:
             return matching_manual
-        return auto_track
 
-    # If no auto-generated track, choose the first creator-uploaded manual track
+    # Prioritize creator-uploaded manual tracks over auto-generated ones
     manual_track = next((t for t in track_list if not getattr(t, "is_generated", False)), None)
     if manual_track:
         return manual_track
 
-    # Fall back to first track
+    # Fall back to auto-generated track if present
+    if auto_track:
+        return auto_track
+
     return track_list[0]
 
 
 def fetch_raw_transcript(
     video_id: str,
-    preferred_language: Optional[str] = None
+    preferred_language: Optional[str] = None,
+    video_title: Optional[str] = None,
 ) -> Tuple[List[dict], str, str, bool, List[TranscriptLanguage], Any]:
     """
     Fetches raw transcript segments, respecting original language auto-detection,
@@ -226,6 +328,12 @@ def fetch_raw_transcript(
             )
         )
 
+    logger.info(
+        "Available caption tracks for %s: %s",
+        video_id,
+        [(t.language_code, t.language, "generated" if t.is_generated else "manual") for t in track_list],
+    )
+
     if not track_list:
         raise YouTubeError("No accessible caption tracks available for this video", "NO_CAPTIONS", 404)
 
@@ -252,9 +360,16 @@ def fetch_raw_transcript(
                     target_track = t
                     break
 
-    # If no specific preferred language or preferred was 'auto', detect original language track!
+        # When a specific preferred language is requested, do not fall back to an unrelated track
+        if not target_track:
+            logger.warning("Requested preferred language '%s' not found in available tracks for %s", preferred_language, video_id)
+            raise YouTubeError(f"No caption track found for language '{preferred_language}'", "NO_CAPTIONS", 404)
+    else:
+        # Auto-detect original language track
+        target_track = detect_original_track(track_list, video_title=video_title)
+
     if not target_track:
-        target_track = detect_original_track(track_list)
+        raise YouTubeError("Original language captions are unavailable for this video", "NO_CAPTIONS", 404)
 
     try:
         fetched = target_track.fetch()
@@ -262,6 +377,13 @@ def fetch_raw_transcript(
         lang_name = getattr(target_track, "language", "Unknown")
         lang_code = getattr(target_track, "language_code", "unknown")
         is_gen = getattr(target_track, "is_generated", False)
+        logger.info(
+            "Selected caption track for %s: code='%s', name='%s', is_generated=%s, is_translated=False",
+            video_id,
+            lang_code,
+            lang_name,
+            is_gen,
+        )
         return raw_data, lang_name, lang_code, is_gen, available_languages, target_track
     except Exception as e:
         raise YouTubeError(f"Failed to fetch subtitle content: {str(e)}", "FETCH_FAILED", 500)

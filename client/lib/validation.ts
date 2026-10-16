@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const YOUTUBE_URL_REGEX =
-  /^(https?:\/\/)?(www\.|m\.)?(youtube\.com\/(watch\?v=|shorts\/|embed\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})([?&].*)?$/;
+  /^(https?:\/\/)?(www\.|m\.)?(youtube\.com\/(watch\?v=|shorts\/|embed\/|live\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})([?&].*)?$/;
 
 const DIRECT_VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{11}$/;
 
@@ -28,7 +28,7 @@ export function extractClientVideoId(urlOrId: string): string | null {
     return clean;
   }
   const match = clean.match(
-    /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|embed\/|v\/))([a-zA-Z0-9_-]{11})/
+    /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|embed\/|live\/|v\/))([a-zA-Z0-9_-]{11})/
   );
   return match ? match[1] : null;
 }

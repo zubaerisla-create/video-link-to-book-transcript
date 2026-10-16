@@ -26,3 +26,6 @@ server/.env
 *.webm
 .cache/
 huggingface/
+*.db
+*.sqlite
+*.sqlite3

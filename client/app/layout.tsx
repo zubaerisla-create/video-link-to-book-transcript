@@ -1,20 +1,66 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { AuthProvider } from "@/lib/auth-context";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://transcriptly.net";
+const adsenseClientId = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
 
 export const metadata: Metadata = {
-  title: "Transcriptly | Turn YouTube Videos Into Readable Transcripts",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Transcriptly | Turn YouTube Videos Into Readable Transcripts & Digital Books",
+    template: "%s | Transcriptly",
+  },
   description:
-    "Extract captions, organize transcripts into readable paragraphs, and export your text in seconds without paid API keys.",
-  keywords: ["youtube transcript", "youtube subtitles", "video to text", "caption extractor"],
+    "Extract clean captions from any YouTube video in Bangla, English, and other languages. Formats captions into readable paragraphs, provides side-by-side translation, and saves transcripts as digital books.",
+  keywords: [
+    "youtube transcript",
+    "youtube subtitles extractor",
+    "youtube to text",
+    "bangla youtube transcript",
+    "digital book reader",
+    "caption generator",
+    "video to text converter",
+    "youtube caption download",
+  ],
+  authors: [{ name: "Transcriptly Team" }],
+  creator: "Transcriptly",
+  publisher: "Transcriptly",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: siteUrl,
+    siteName: "Transcriptly",
+    title: "Transcriptly | YouTube Video URL to Readable Transcript & Digital Books",
+    description:
+      "Transform messy, fragmented YouTube subtitles into clean, readable paragraphs with multilingual support, translation, and personal library saving.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Transcriptly | YouTube Video to Transcript Tool",
+    description:
+      "Extract clean captions from YouTube videos into readable paragraphs, timestamped SRT, and personal digital books.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({
@@ -23,11 +69,26 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
+    <html lang="en" className="h-full antialiased">
+      <head>
+        {adsenseClientId && adsenseClientId.startsWith("ca-pub-") && (
+          <>
+            <meta name="google-adsense-account" content={adsenseClientId} />
+            <Script
+              async
+              src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClientId}`}
+              crossOrigin="anonymous"
+              strategy="afterInteractive"
+            />
+          </>
+        )}
+      </head>
       <body className="min-h-full flex flex-col bg-[#FFFDF8] text-[#292522]">
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        <Footer />
+        <AuthProvider>
+          <Navbar />
+          <main className="flex-1">{children}</main>
+          <Footer />
+        </AuthProvider>
       </body>
     </html>
   );

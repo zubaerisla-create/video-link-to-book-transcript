@@ -1,0 +1,107 @@
+name: CI/CD Pipeline - Test & Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Tests & Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Backend Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r server/requirements.txt
+          pip install pytest httpx
+
+      - name: Run Backend Tests
+        run: |
+          PYTHONPATH=. pytest server/tests/
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Verify Frontend Build
+        working-directory: client
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: "http://localhost:8000"
+          NEXT_PUBLIC_GITHUB_URL: "https://github.com/zubaerisla-create"
+
+  deploy:
+    name: Deploy to Production VPS
+    needs: test
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and Deploy to VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script_stop: true
+          script: |
+            echo "🚀 Starting automated deployment on VPS..."
+            cd /var/www/transcriptly
+
+            # Configure git if not present
+            if [ ! -d .git ]; then
+              git init
+              git remote add origin https://github.com/zubaerisla-create/video-link-to-book-transcript.git
+            fi
+
+            # Ensure remote URL is correct
+            git remote set-url origin https://github.com/zubaerisla-create/video-link-to-book-transcript.git
+
+            # Pull latest changes from main
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Update Python backend dependencies & database
+            echo "📦 Updating Python backend..."
+            server/venv/bin/pip install --upgrade pip
+            server/venv/bin/pip install --no-cache-dir -r server/requirements.txt
+            PYTHONPATH=. server/venv/bin/python3 server/app/db/init_db.py || true
+
+            # Build Next.js frontend
+            echo "🔨 Building frontend..."
+            cd client
+            npm install
+            npm run build
+            cd ..
+
+            # Restart application services
+            echo "🔄 Restarting systemd services..."
+            systemctl restart transcriptly-backend
+            systemctl restart transcriptly-frontend
+
+            # Verify services status
+            systemctl is-active --quiet transcriptly-backend && echo "✅ Backend is active"
+            systemctl is-active --quiet transcriptly-frontend && echo "✅ Frontend is active"
+            echo "🎉 Deployment successfully completed!"

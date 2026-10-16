@@ -1,35 +1,40 @@
-import { ShieldCheck, HeartHandshake, Zap, Lock, Terminal, FileCode } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
+import { HeartHandshake, Lock, Terminal, FileCode, BookOpen, Globe2, ShieldCheck } from "lucide-react";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "About Transcriptly | Purpose, Privacy & Technology",
-  description: "Learn about the mission, architecture, privacy guarantees, and technical limitations of Transcriptly.",
+  description:
+    "Learn about the mission, architecture, privacy guarantees, and digital book reader of Transcriptly, a free tool to extract YouTube transcripts into readable text.",
+  alternates: {
+    canonical: "/about",
+  },
 };
 
 export default function AboutPage() {
   const values = [
     {
-      title: "Verbatim Integrity",
+      title: "Verbatim Text Integrity",
       description:
         "Transcriptly will never rewrite, summarize, or alter speech using generative AI without permission. The speaker’s original phrasing, terms, and factual statements remain 100% intact.",
       icon: HeartHandshake,
     },
     {
-      title: "Zero-Storage Privacy",
+      title: "Privacy-First Architecture",
       description:
-        "We believe in ephemeral utility. Neither your video URLs nor the extracted transcripts are stored in a database or logged to external analytics. Transcripts exist solely in your local browser session.",
+        "For guest visitors, processing is 100% ephemeral in memory: video links and transcripts are discarded when the session ends. For registered members, saved books are private and strictly isolated.",
       icon: Lock,
     },
     {
-      title: "Local-First Architecture",
+      title: "Unicode Multilingual Support",
       description:
-        "Built to run directly on your Linux Mint machine. Free from paid API keys, vendor lock-in, and unpredictable subscription pricing.",
-      icon: Terminal,
+        "Engineered with native typography support for non-Latin writing systems, including Bangla (বাংলা), Hindi, Arabic, Japanese, Spanish, and French, preserving original scripts accurately.",
+      icon: Globe2,
     },
     {
-      title: "Instant Exporting",
+      title: "Universal Exporting",
       description:
-        "Flexible formatting for any workflow: plain text paragraphs for reading and note-taking, JSON for development pipelines, and standard SRT with millisecond timestamps for video editors.",
+        "Flexible formatting for every workflow: plain text paragraphs for note-taking, JSON for development pipelines, standard SRT for video editing, and formatted PDF books for offline reading.",
       icon: FileCode,
     },
   ];
@@ -38,8 +43,7 @@ export default function AboutPage() {
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-16">
       {/* Header */}
       <div className="text-center mb-12 sm:mb-16">
-        <div className="inline-flex items-center gap-1.5 rounded-full bg-[#FFF1B8] px-3 py-1 text-xs font-semibold tracking-wider text-[#292522] uppercase mb-4 border border-[#F0E8E2]">
-          <Zap className="h-3.5 w-3.5 text-[#292522]" />
+        <div className="inline-flex items-center rounded-full bg-[#FFF1B8] px-3.5 py-1 text-xs font-semibold tracking-wider text-[#292522] uppercase mb-4 border border-[#F0E8E2]">
           <span>About Transcriptly</span>
         </div>
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#292522]">
@@ -99,24 +103,38 @@ export default function AboutPage() {
         </div>
       </div>
 
+      {/* Personal Library & Book Reader */}
+      <div className="rounded-2xl border border-[#F0E8E2] bg-[#FFFDF8] p-6 sm:p-8 mb-12 shadow-xs">
+        <div className="flex items-center gap-2.5 mb-3">
+          <BookOpen className="h-6 w-6 text-[#292522]" />
+          <h2 className="text-xl font-bold text-[#292522]">Personal Digital Library & Book Reader</h2>
+        </div>
+        <p className="text-sm sm:text-base text-[#77716D] leading-relaxed mb-4">
+          Reading hours of video lectures on a cluttered video screen causes eye fatigue and distraction. Transcriptly introduces a tailored <strong>Digital Book Reader</strong>:
+        </p>
+        <ul className="text-xs sm:text-sm text-[#77716D] space-y-2 list-disc list-inside">
+          <li><strong>Page-by-Page Reading:</strong> Read long transcripts as structured book pages with previous/next controls or switch to continuous scroll mode.</li>
+          <li><strong>Reading Themes:</strong> Choose between Light, Sepia (warm reading tone), and Dark mode with adjustable typography sizing.</li>
+          <li><strong>Reading Progress Memory:</strong> Resume right where you left off in your study sessions.</li>
+          <li><strong>PDF Book Export:</strong> Generate real, beautifully formatted PDF documents complete with title page, page numbers, and Unicode font rendering for languages like Bangla.</li>
+        </ul>
+      </div>
+
       {/* Technical Limitations & Transparency */}
       <div className="rounded-2xl border border-[#F0E8E2] bg-white p-6 sm:p-8 mb-12 shadow-xs">
-        <div className="flex items-center gap-2 mb-4">
-          <ShieldCheck className="h-5 w-5 text-[#292522]" />
-          <h2 className="text-xl font-bold text-[#292522]">Technical Limitations & Privacy</h2>
-        </div>
+        <h2 className="text-xl font-bold text-[#292522] mb-4">Technical Limitations & Privacy</h2>
         <div className="space-y-3 text-sm text-[#77716D] leading-relaxed">
           <p>
             <strong className="text-[#292522]">Multilingual & Original Language Integrity:</strong> Transcriptly automatically detects the video&apos;s true spoken language (such as Bangla, English, Hindi, Arabic, Urdu, Spanish, French) and preserves the original writing script without unwanted automated translation.
           </p>
           <p>
-            <strong className="text-[#292522]">Local Speech Recognition Fallback:</strong> When a public video lacks accessible caption tracks, Transcriptly offers an optional local speech recognition fallback powered by faster-whisper. The model executes directly on your machine without sending audio to paid APIs.
+            <strong className="text-[#292522]">Speech Recognition Fallback:</strong> When a public video lacks accessible caption tracks, Transcriptly offers an optional speech recognition fallback powered by faster-whisper to transcribe audio without sending data to paid third-party APIs.
           </p>
           <p>
-            <strong className="text-[#292522]">Aligned Multilingual Translation:</strong> When translation mode is chosen, the engine translates transcripts using existing YouTube caption tracks or free modular translation providers, preserving paragraph structure and segment timestamp alignment.
+            <strong className="text-[#292522]">Aligned Multilingual Translation:</strong> When translation mode is chosen, the engine translates transcripts using existing YouTube caption tracks or modular translation providers, preserving paragraph structure and segment timestamp alignment.
           </p>
           <p>
-            <strong className="text-[#292522]">Ephemeral Processing:</strong> All temporary audio downloads and transcript texts exist strictly in temporary local memory and are never persisted in a database or shared with third parties.
+            <strong className="text-[#292522]">Ephemeral Processing vs. Saved Library:</strong> Guest requests are processed in memory and never logged to a database. Transcripts are only stored permanently when an authenticated member explicitly clicks &ldquo;Save to My Library&rdquo;.
           </p>
         </div>
       </div>

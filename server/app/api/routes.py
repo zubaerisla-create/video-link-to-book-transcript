@@ -1,4 +1,6 @@
+import logging
 from fastapi import APIRouter, HTTPException, Query, status
+
 from server.app.schemas.transcript import (
     TranscriptRequest,
     TranscriptResponse,
@@ -27,6 +29,7 @@ from server.app.services.speech_service import (
     SpeechRecognitionError,
 )
 
+logger = logging.getLogger("transcriptly.api")
 router = APIRouter(prefix="/api")
 
 
@@ -117,6 +120,23 @@ async def extract_transcript(payload: TranscriptRequest):
 
     # 2. Fetch video metadata via oEmbed
     video_info = await get_video_info(vid)
+    video_title = None
+    if video_info:
+        if isinstance(video_info, dict):
+            video_title = video_info.get("title")
+        else:
+            video_title = getattr(video_info, "title", None)
+
+    logger.info(
+        "Received transcript extraction request: vid=%s, language_mode=%s, preferred_language=%s, "
+        "target_language=%s, enable_speech_fallback=%s, title='%s'",
+        vid,
+        payload.language_mode,
+        payload.language,
+        payload.target_language,
+        payload.enable_speech_fallback,
+        video_title,
+    )
 
     transcription_method = "youtube_captions"
     track_object = None
@@ -127,20 +147,45 @@ async def extract_transcript(payload: TranscriptRequest):
     is_gen = False
     warnings = []
 
-    # 3. Step A: Try caption extraction first
+    # 3. Step A: Try caption extraction first, passing video_title to prevent misidentifying conflicting auto tracks
     try:
         raw_segments, lang_name, lang_code, is_gen, available_langs, track_object = fetch_raw_transcript(
-            vid, preferred_language=payload.language
+            vid, preferred_language=payload.language, video_title=video_title
+        )
+        logger.info(
+            "Selected caption track for %s: lang_code='%s', lang_name='%s', is_generated=%s, is_translated=False",
+            vid,
+            lang_code,
+            lang_name,
+            is_gen,
         )
     except YouTubeError as caption_err:
-        # If no captions and speech recognition fallback is requested
-        if payload.enable_speech_fallback and caption_err.code in ("NO_CAPTIONS", "RETRIEVAL_FAILED"):
+        logger.warning(
+            "Caption extraction failed or original track unavailable for %s: %s (code=%s)",
+            vid,
+            caption_err.message,
+            caption_err.code,
+        )
+        # If captions are unavailable, rate-limited, or failed, and speech recognition fallback is requested
+        if payload.enable_speech_fallback and caption_err.code in ("NO_CAPTIONS", "RETRIEVAL_FAILED", "YOUTUBE_BLOCKED"):
+            logger.info("Initiating local speech recognition fallback via faster-whisper for %s...", vid)
             try:
-                raw_segments, lang_name, lang_code = await transcribe_youtube_audio(vid)
+                raw_segments, lang_name, lang_code = await transcribe_youtube_audio(
+                    vid, preferred_language=payload.language
+                )
                 transcription_method = "speech_recognition"
                 is_gen = True
-                warnings.append("No accessible captions found. Transcript was generated using local speech recognition.")
+                logger.info(
+                    "Speech recognition fallback completed for %s: detected_language='%s' (%s)",
+                    vid,
+                    lang_code,
+                    lang_name,
+                )
+                warnings.append(
+                    f"No accessible captions found. Transcript was generated using local speech recognition ({lang_name})."
+                )
             except SpeechRecognitionError as speech_err:
+                logger.error("Speech recognition fallback failed for %s: %s", vid, speech_err.message)
                 raise HTTPException(
                     status_code=speech_err.status_code,
                     detail={"detail": speech_err.message, "code": speech_err.code},
@@ -148,7 +193,7 @@ async def extract_transcript(payload: TranscriptRequest):
         else:
             # Re-raise caption error with explanation of speech fallback
             hint = ""
-            if not payload.enable_speech_fallback and caption_err.code == "NO_CAPTIONS":
+            if not payload.enable_speech_fallback and caption_err.code in ("NO_CAPTIONS", "YOUTUBE_BLOCKED"):
                 hint = " You can enable the Speech-to-Text fallback option to transcribe the audio locally."
             raise HTTPException(
                 status_code=caption_err.status_code,
@@ -165,14 +210,17 @@ async def extract_transcript(payload: TranscriptRequest):
     detected_lang_name = lang_name or get_language_display_name(lang_code)
 
     # 5. Translation Handling
+    # In original mode, NEVER translate and never set target_language
     is_translated = False
     translated_paragraphs = None
     translated_segments = None
     translated_srt = None
     translation_provider = None
     target_lang_name = None
+    effective_target_language = None
 
     if payload.language_mode == "translate" and payload.target_language:
+        effective_target_language = payload.target_language
         target_clean = payload.target_language.lower().strip()
         target_lang_name = get_language_display_name(target_clean)
 
@@ -196,7 +244,15 @@ async def extract_transcript(payload: TranscriptRequest):
                 translated_segments = trans_segs
                 translated_srt = trans_srt
                 translation_provider = provider_used
+                logger.info(
+                    "Translation completed for %s: source='%s', target='%s', provider='%s'",
+                    vid,
+                    detected_lang_code,
+                    target_clean,
+                    provider_used,
+                )
             except TranslationError as te:
+                logger.error("Translation failed for %s: %s", vid, te.message)
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail={"detail": te.message, "code": te.code},
@@ -207,8 +263,8 @@ async def extract_transcript(payload: TranscriptRequest):
         active_paragraphs = translated_paragraphs
         active_segments = translated_segments
         active_srt = translated_srt
-        active_lang = payload.target_language
-        active_lang_name = target_lang_name or get_language_display_name(payload.target_language)
+        active_lang = effective_target_language or payload.target_language
+        active_lang_name = target_lang_name or get_language_display_name(active_lang)
         active_word_count = sum(len(p.split()) for p in active_paragraphs)
         active_char_count = sum(len(p) for p in active_paragraphs)
     else:
@@ -230,7 +286,7 @@ async def extract_transcript(payload: TranscriptRequest):
         is_generated=is_gen,
         transcription_method=transcription_method,
         language_mode=payload.language_mode,
-        target_language=payload.target_language,
+        target_language=effective_target_language,
         target_language_name=target_lang_name,
         is_translated=is_translated,
         translation_provider=translation_provider,

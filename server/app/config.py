@@ -2,18 +2,62 @@ import os
 import shutil
 from pydantic import BaseModel
 
+# Automatically load server/.env if present
+env_candidates = [
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "server", ".env"),
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"),
+    os.path.join(os.getcwd(), "server", ".env"),
+    os.path.join(os.getcwd(), ".env"),
+]
+for candidate in env_candidates:
+    if os.path.isfile(candidate):
+        try:
+            with open(candidate, "r", encoding="utf-8") as _f:
+                for _line in _f:
+                    _line = _line.strip()
+                    if _line and not _line.startswith("#") and "=" in _line:
+                        _k, _v = _line.split("=", 1)
+                        os.environ.setdefault(_k.strip(), _v.strip())
+        except Exception:
+            pass
+        break
+
 class Settings(BaseModel):
     APP_NAME: str = "Transcriptly API"
-    APP_VERSION: str = "1.1.0"
+    APP_VERSION: str = "1.2.0"
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8000"))
+    
+    # CORS
     CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3001",
+        "http://localhost:3005",
+        "http://127.0.0.1:3005",
+        "http://31.97.180.176",
+        "http://31.97.180.176:80",
+        "http://31.97.180.176:8080",
+        "http://31.97.180.176:3005",
+    ] + [
+        origin.strip()
+        for origin in os.getenv("ADDITIONAL_CORS_ORIGINS", "").split(",")
+        if origin.strip()
     ]
+    
     RATE_LIMIT_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
+    AUTH_RATE_LIMIT_PER_MINUTE: int = int(os.getenv("AUTH_RATE_LIMIT_PER_MINUTE", "15"))
+
+    # Database Settings
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./transcriptly.db")
+
+    # Security & JWT
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "transcriptly-insecure-dev-key-change-in-production-123456")
+    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+    JWT_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", str(60 * 24 * 7)))  # 7 days
+    COOKIE_NAME: str = "transcriptly_auth_token"
+    COOKIE_SECURE: bool = os.getenv("COOKIE_SECURE", "false").lower() in ("true", "1")
 
     # Speech Recognition (faster-whisper) Settings
     ENABLE_SPEECH_RECOGNITION: bool = os.getenv("ENABLE_SPEECH_RECOGNITION", "true").lower() in ("true", "1")

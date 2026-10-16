@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useId } from "react";
+import React, { useState, useEffect, useId, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
-  Sparkles,
   Link as LinkIcon,
   X,
   Clipboard,
@@ -22,11 +23,17 @@ import {
   Columns2,
   ShieldCheck,
   Globe2,
+  BookmarkPlus,
+  BookOpen,
+  Loader2,
+  ArrowRight,
 } from "lucide-react";
 import {
   fetchTranscript,
+  saveBookApi,
   ApiError,
 } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import {
   TranscriptResponse,
   ParagraphLengthMode,
@@ -64,20 +71,11 @@ const TRANSLATION_TARGET_LANGUAGES = [
   { code: "zh", name: "Chinese (中文)" },
 ];
 
-const SAMPLE_VIDEOS = [
-  {
-    title: "Rick Astley - Never Gonna Give You Up",
-    url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    tag: "English / Multi-track",
-  },
-  {
-    title: "Steve Jobs Stanford Commencement Speech",
-    url: "https://www.youtube.com/watch?v=UF8uR6Z6KLc",
-    tag: "English Speech",
-  },
-];
+function HomePageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { isAuthenticated } = useAuth();
 
-export default function HomePage() {
   const [url, setUrl] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
   const [paragraphLength, setParagraphLength] = useState<ParagraphLengthMode>("medium");
@@ -93,6 +91,32 @@ export default function HomePage() {
   const [loadingMessage, setLoadingMessage] = useState("Extracting transcript...");
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [result, setResult] = useState<TranscriptResponse | null>(null);
+
+  // Save Book to Library Modal state
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [bookTitle, setBookTitle] = useState("");
+  const [isSavingBook, setIsSavingBook] = useState(false);
+  const [savedBookId, setSavedBookId] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Restore pending save if coming back from login/signup
+  useEffect(() => {
+    const shouldSave = searchParams.get("save") === "true";
+    if (shouldSave) {
+      try {
+        const raw = sessionStorage.getItem("transcriptly_pending_save");
+        if (raw) {
+          const parsed = JSON.parse(raw) as TranscriptResponse;
+          setResult(parsed);
+          setUrl(`https://www.youtube.com/watch?v=${parsed.video_id}`);
+          setBookTitle(parsed.video_info?.title || `Transcript (${parsed.video_id})`);
+          setShowSaveModal(true);
+        }
+      } catch {
+        // invalid JSON
+      }
+    }
+  }, [searchParams]);
 
   // Active view states
   const [activeTab, setActiveTab] = useState<"paragraphs" | "segments">("paragraphs");
@@ -364,6 +388,61 @@ export default function HomePage() {
     downloadFile(srtContent, `${cleanTitle}-captions.srt`, "text/plain;charset=utf-8");
   };
 
+  const handleSaveClick = () => {
+    if (!result) return;
+    if (!isAuthenticated) {
+      sessionStorage.setItem("transcriptly_pending_save", JSON.stringify(result));
+      router.push("/login?redirect=pending_save");
+      return;
+    }
+    setBookTitle(result.video_info?.title || `Transcript of ${result.video_id}`);
+    setSavedBookId(null);
+    setSaveError(null);
+    setShowSaveModal(true);
+  };
+
+  const handleConfirmSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!result || !bookTitle.trim()) return;
+
+    try {
+      setIsSavingBook(true);
+      setSaveError(null);
+      const saved = await saveBookApi({
+        title: bookTitle.trim(),
+        video_id: result.video_id,
+        video_url: `https://www.youtube.com/watch?v=${result.video_id}`,
+        channel_title: result.video_info?.author || null,
+        thumbnail_url: result.video_info?.thumbnail_url || null,
+        language: result.language,
+        language_name: result.language_name,
+        detected_language: result.detected_language,
+        is_translated: result.is_translated,
+        target_language: result.target_language,
+        translation_provider: result.translation_provider,
+        paragraphs: result.paragraphs,
+        segments: result.segments,
+        srt: result.srt,
+        original_paragraphs: result.original_paragraphs,
+        original_segments: result.original_segments,
+        original_srt: result.original_srt,
+        translated_paragraphs: result.translated_paragraphs,
+        translated_segments: result.translated_segments,
+      });
+
+      setSavedBookId(saved.id);
+      sessionStorage.removeItem("transcriptly_pending_save");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setSaveError(err.message);
+      } else {
+        setSaveError("Failed to save digital book. Please try again.");
+      }
+    } finally {
+      setIsSavingBook(false);
+    }
+  };
+
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
@@ -392,8 +471,7 @@ export default function HomePage() {
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
       {/* Hero Section */}
       <div className="text-center mb-8 sm:mb-10">
-        <div className="inline-flex items-center gap-1.5 rounded-full bg-[#FFF1B8] px-3 py-1 text-xs font-semibold tracking-wider text-[#292522] uppercase mb-4 border border-[#F0E8E2]">
-          <Sparkles className="h-3.5 w-3.5 text-[#292522]" />
+        <div className="inline-flex items-center rounded-full bg-[#FFF1B8] px-3.5 py-1 text-xs font-semibold tracking-wider text-[#292522] uppercase mb-4 border border-[#F0E8E2]">
           <span>Multilingual YouTube Transcript Extractor</span>
         </div>
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-[#292522]">
@@ -865,6 +943,15 @@ export default function HomePage() {
 
                 <button
                   type="button"
+                  onClick={handleSaveClick}
+                  className="flex items-center gap-1.5 rounded-lg border border-[#E9A9C3] bg-[#F8DDE8] px-3 py-1.5 text-xs font-semibold text-[#292522] hover:bg-[#DE91B1]/40 transition-colors shadow-xs cursor-pointer"
+                >
+                  <BookmarkPlus className="h-3.5 w-3.5 text-[#292522]" />
+                  <span>Save to My Library</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={handleCopyAll}
                   className="flex items-center gap-1.5 rounded-lg bg-[#E9A9C3] px-3 py-1.5 text-xs font-semibold text-[#292522] hover:bg-[#DE91B1] transition-colors shadow-xs"
                 >
@@ -1033,53 +1120,508 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Empty State */}
-      {!result && !isLoading && (
-        <div className="rounded-2xl border border-[#F0E8E2] bg-white p-8 sm:p-10 shadow-xs">
-          <div className="text-center max-w-lg mx-auto mb-8">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FFF1B8] border border-[#F0E8E2] text-[#292522] mb-3">
-              <FileText className="h-6 w-6" />
-            </div>
-            <h2 className="text-base sm:text-lg font-semibold text-[#292522]">
-              Ready to extract clean transcripts
+      {/* Supporting Editorial Content & AdSense Value Sections */}
+      <div className="mt-16 space-y-16">
+        {/* Schema markup */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@graph": [
+                {
+                  "@type": "WebApplication",
+                  "name": "Transcriptly",
+                  "url": "https://transcriptly.net",
+                  "description":
+                    "Extract clean captions from YouTube videos into readable paragraphs, bilingual translations, and personal digital books.",
+                  "applicationCategory": "UtilityApplication",
+                  "operatingSystem": "All",
+                  "offers": {
+                    "@type": "Offer",
+                    "price": "0",
+                    "priceCurrency": "USD",
+                  },
+                },
+                {
+                  "@type": "FAQPage",
+                  "mainEntity": [
+                    {
+                      "@type": "Question",
+                      "name": "How do I extract a transcript from a YouTube video?",
+                      "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text":
+                          "Copy any YouTube video link, paste it into the URL field above, and click Extract Transcript. Transcriptly immediately extracts available captions and formats them into clean paragraphs.",
+                      },
+                    },
+                    {
+                      "@type": "Question",
+                      "name": "What makes Transcriptly different from copying subtitles directly on YouTube?",
+                      "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text":
+                          "YouTube breaks subtitles into hundreds of 3-word fragments with timestamps on every line. Transcriptly automatically detects natural sentence boundaries and speaker pauses to assemble them into pleasant, readable prose.",
+                      },
+                    },
+                    {
+                      "@type": "Question",
+                      "name": "Does Transcriptly support non-English languages like Bangla?",
+                      "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text":
+                          "Yes. Transcriptly includes native Unicode typography support for multilingual captions, including Bangla (বাংলা), Hindi, Arabic, Spanish, French, and other languages.",
+                      },
+                    },
+                    {
+                      "@type": "Question",
+                      "name": "Can I save transcripts permanently to read later?",
+                      "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text":
+                          "Yes. By creating a free account, you can save any transcript into your personal library and read it with our distraction-free digital book reader.",
+                      },
+                    },
+                    {
+                      "@type": "Question",
+                      "name": "What export formats are supported?",
+                      "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text":
+                          "Transcripts can be exported as plain text (.txt), SubRip subtitle files (.srt) with millisecond timecodes, structured JSON (.json), and formatted PDF books.",
+                      },
+                    },
+                  ],
+                },
+              ],
+            }),
+          }}
+        />
+
+        {/* 3 Steps */}
+        <section className="rounded-3xl border border-[#F0E8E2] bg-white p-6 sm:p-10 shadow-xs">
+          <div className="text-center max-w-xl mx-auto mb-10">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#292522]">
+              How to Get a YouTube Transcript in 3 Steps
             </h2>
-            <p className="mt-1 text-xs sm:text-sm text-[#77716D] leading-relaxed">
-              Paste any YouTube video link above to extract clean captions and formatted paragraphs in any language, or try a verified sample video below.
+            <p className="mt-2 text-xs sm:text-sm text-[#77716D] leading-relaxed">
+              No browser extensions, no command-line tools, and no account required for instant extraction.
             </p>
           </div>
 
-          <div className="border-t border-[#F0E8E2] pt-6">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#77716D] mb-3 text-center sm:text-left">
-              Try a sample video:
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {SAMPLE_VIDEOS.map((sample) => (
-                <button
-                  key={sample.url}
-                  type="button"
-                  onClick={() => {
-                    setUrl(sample.url);
-                    setUrlError(null);
-                    setError(null);
-                    handleExtract(sample.url);
-                  }}
-                  className="flex items-center justify-between rounded-xl border border-[#F0E8E2] bg-[#FFFDF8] p-3 text-left hover:border-[#E9A9C3] hover:bg-[#F8DDE8]/20 transition-all group"
-                >
-                  <div className="min-w-0 pr-2">
-                    <p className="text-xs sm:text-sm font-medium text-[#292522] truncate">
-                      {sample.title}
-                    </p>
-                    <span className="text-[11px] text-[#77716D]">{sample.tag}</span>
-                  </div>
-                  <span className="shrink-0 text-xs font-medium text-[#292522] bg-[#FFF1B8] px-2 py-0.5 rounded-md border border-[#F0E8E2]">
-                    Try
-                  </span>
-                </button>
-              ))}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="rounded-2xl border border-[#F0E8E2] bg-[#FFFDF8] p-6 flex flex-col justify-between">
+              <div>
+                <span className="text-3xl font-black text-[#E9A9C3] mb-3 block">01</span>
+                <h3 className="font-bold text-base text-[#292522] mb-2">Paste Any YouTube Link</h3>
+                <p className="text-xs sm:text-sm text-[#77716D] leading-relaxed">
+                  Provide any public video link: standard watch URLs, shortened <code>youtu.be</code> links, YouTube Shorts, or embed links.
+                </p>
+              </div>
             </div>
+
+            <div className="rounded-2xl border border-[#F0E8E2] bg-[#FFFDF8] p-6 flex flex-col justify-between">
+              <div>
+                <span className="text-3xl font-black text-[#E9A9C3] mb-3 block">02</span>
+                <h3 className="font-bold text-base text-[#292522] mb-2">Clean Paragraph Assembly</h3>
+                <p className="text-xs sm:text-sm text-[#77716D] leading-relaxed">
+                  Transcriptly parses the caption stream and uses speaker pauses to eliminate choppy breaks, assembling coherent sentences.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[#F0E8E2] bg-[#FFFDF8] p-6 flex flex-col justify-between">
+              <div>
+                <span className="text-3xl font-black text-[#E9A9C3] mb-3 block">03</span>
+                <h3 className="font-bold text-base text-[#292522] mb-2">Read, Save & Export</h3>
+                <p className="text-xs sm:text-sm text-[#77716D] leading-relaxed">
+                  Copy to clipboard with one click, download SRT/TXT/PDF files, or save to your personal library to read distraction-free.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Feature Highlights Grid */}
+        <section className="space-y-6">
+          <div className="text-center max-w-xl mx-auto">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#292522]">
+              Engineered for Real Reading & Research
+            </h2>
+            <p className="mt-2 text-xs sm:text-sm text-[#77716D]">
+              Designed to help students, researchers, journalists, and language learners digest video information quickly.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="rounded-2xl border border-[#F0E8E2] bg-white p-6 shadow-xs">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF1B8] border border-[#F0E8E2] text-[#292522] mb-4">
+                <FileText className="h-5 w-5" />
+              </div>
+              <h3 className="font-bold text-base text-[#292522] mb-2">Readable Paragraphs</h3>
+              <p className="text-xs sm:text-sm text-[#77716D] leading-relaxed">
+                Raw subtitle tracks display 2–4 words per line. We assemble them into natural paragraphs suitable for reading and article drafting.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[#F0E8E2] bg-white p-6 shadow-xs">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F8DDE8] border border-[#F0E8E2] text-[#292522] mb-4">
+                <Globe2 className="h-5 w-5" />
+              </div>
+              <h3 className="font-bold text-base text-[#292522] mb-2">Native Unicode & Bangla</h3>
+              <p className="text-xs sm:text-sm text-[#77716D] leading-relaxed">
+                Complete font and encoding integrity for Bangla (বাংলা), Hindi, Arabic, and other non-Latin scripts without unwanted machine rewriting.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[#F0E8E2] bg-white p-6 shadow-xs">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF1B8] border border-[#F0E8E2] text-[#292522] mb-4">
+                <Columns2 className="h-5 w-5" />
+              </div>
+              <h3 className="font-bold text-base text-[#292522] mb-2">Side-by-Side Translation</h3>
+              <p className="text-xs sm:text-sm text-[#77716D] leading-relaxed">
+                Translate video transcripts while maintaining aligned original and translated paragraphs side-by-side for language study.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[#F0E8E2] bg-white p-6 shadow-xs">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F8DDE8] border border-[#F0E8E2] text-[#292522] mb-4">
+                <BookOpen className="h-5 w-5" />
+              </div>
+              <h3 className="font-bold text-base text-[#292522] mb-2">Digital Book Reader</h3>
+              <p className="text-xs sm:text-sm text-[#77716D] leading-relaxed">
+                Save long transcripts as permanent digital books. Read page-by-page with Light, Sepia, and Dark themes and progress memory.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[#F0E8E2] bg-white p-6 shadow-xs">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF1B8] border border-[#F0E8E2] text-[#292522] mb-4">
+                <Clock className="h-5 w-5" />
+              </div>
+              <h3 className="font-bold text-base text-[#292522] mb-2">Timestamped SRT Subtitles</h3>
+              <p className="text-xs sm:text-sm text-[#77716D] leading-relaxed">
+                Switch to the timestamped tab to cross-reference video moments, or export standard SubRip (.srt) files for video editors.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[#F0E8E2] bg-white p-6 shadow-xs">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F8DDE8] border border-[#F0E8E2] text-[#292522] mb-4">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <h3 className="font-bold text-base text-[#292522] mb-2">Privacy & Ephemeral Utility</h3>
+              <p className="text-xs sm:text-sm text-[#77716D] leading-relaxed">
+                Guest extraction is processed strictly in-memory and discarded. Saved books in member accounts are private and never shared.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Caption Availability Transparency Notice */}
+        <section className="rounded-2xl border border-[#F0E8E2] bg-[#FFF1B8]/30 p-6 sm:p-8 flex flex-col sm:flex-row gap-5 items-start">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#FFF1B8] border border-[#F0E8E2] text-[#292522]">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-base sm:text-lg font-bold text-[#292522]">
+              Caption Availability & Transparency
+            </h3>
+            <p className="text-xs sm:text-sm text-[#77716D] leading-relaxed">
+              Transcriptly extracts publicly available creator-uploaded subtitle tracks and YouTube auto-generated captions. If an uploader disables subtitles or the video is restricted, Transcriptly will inform you clearly. For videos without captions, you can enable our optional local speech recognition fallback in Options.
+            </p>
+            <div className="pt-2">
+              <Link
+                href="/guides/how-to-fix-missing-unavailable-captions"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-[#292522] underline hover:text-[#E9A9C3]"
+              >
+                Read our troubleshooting guide on missing captions →
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* Learning Guides Callout */}
+        <section className="rounded-3xl border border-[#F0E8E2] bg-white p-6 sm:p-10 shadow-xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-[#F0E8E2]">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#292522]">
+                Guides & Tutorials
+              </h2>
+              <p className="mt-1 text-xs sm:text-sm text-[#77716D]">
+                Learn how to get the most out of video transcripts for studying, research, and note-taking.
+              </p>
+            </div>
+            <Link
+              href="/guides"
+              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#292522] hover:text-[#E9A9C3]"
+            >
+              <span>View All 5 Guides</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Link
+              href="/guides/how-to-get-transcript-from-youtube"
+              className="rounded-2xl border border-[#F0E8E2] bg-[#FFFDF8] p-4 sm:p-5 hover:border-[#E9A9C3] transition-colors group"
+            >
+              <h3 className="font-bold text-sm sm:text-base text-[#292522] group-hover:text-[#292522] mb-1">
+                How to Get a Transcript from a YouTube Video →
+              </h3>
+              <p className="text-xs text-[#77716D]">
+                Step-by-step walkthrough using built-in YouTube player controls and Transcriptly.
+              </p>
+            </Link>
+
+            <Link
+              href="/guides/how-to-copy-and-save-youtube-captions"
+              className="rounded-2xl border border-[#F0E8E2] bg-[#FFFDF8] p-4 sm:p-5 hover:border-[#E9A9C3] transition-colors group"
+            >
+              <h3 className="font-bold text-sm sm:text-base text-[#292522] group-hover:text-[#292522] mb-1">
+                How to Copy, Format, and Save YouTube Captions →
+              </h3>
+              <p className="text-xs text-[#77716D]">
+                Format messy captions into clean paragraphs and export TXT, SRT, and PDF files.
+              </p>
+            </Link>
+
+            <Link
+              href="/guides/how-to-use-transcripts-for-studying-research"
+              className="rounded-2xl border border-[#F0E8E2] bg-[#FFFDF8] p-4 sm:p-5 hover:border-[#E9A9C3] transition-colors group"
+            >
+              <h3 className="font-bold text-sm sm:text-base text-[#292522] group-hover:text-[#292522] mb-1">
+                How to Use Transcripts for Studying and Research →
+              </h3>
+              <p className="text-xs text-[#77716D]">
+                Proven strategies to speed up comprehension, cite lectures, and build study books.
+              </p>
+            </Link>
+
+            <Link
+              href="/guides/understanding-transcript-languages-and-timestamps"
+              className="rounded-2xl border border-[#F0E8E2] bg-[#FFFDF8] p-4 sm:p-5 hover:border-[#E9A9C3] transition-colors group"
+            >
+              <h3 className="font-bold text-sm sm:text-base text-[#292522] group-hover:text-[#292522] mb-1">
+                Understanding Transcript Languages & SRT Files →
+              </h3>
+              <p className="text-xs text-[#77716D]">
+                How automated caption tracks differ from creator tracks and how SRT timecodes operate.
+              </p>
+            </Link>
+          </div>
+        </section>
+
+        {/* Homepage FAQ Section */}
+        <section className="space-y-6">
+          <div className="text-center max-w-xl mx-auto">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#292522]">
+              Frequently Asked Questions
+            </h2>
+            <p className="mt-2 text-xs sm:text-sm text-[#77716D]">
+              Quick answers to common questions about using Transcriptly.
+            </p>
+          </div>
+
+          <div className="space-y-3 max-w-3xl mx-auto">
+            <details className="group rounded-2xl border border-[#F0E8E2] bg-white p-5 shadow-xs open:border-[#E9A9C3] open:bg-[#FFFDF8] transition-colors">
+              <summary className="flex cursor-pointer items-center justify-between font-semibold text-sm sm:text-base text-[#292522] list-none">
+                <span>How do I extract a transcript from a YouTube video?</span>
+                <span className="ml-4 shrink-0 transition-transform duration-200 group-open:rotate-180 text-[#77716D]">
+                  <ChevronDown className="h-4 w-4" />
+                </span>
+              </summary>
+              <p className="mt-3 text-xs sm:text-sm text-[#77716D] leading-relaxed border-t border-[#F0E8E2]/60 pt-3">
+                Copy the link of any public YouTube video, paste it into the URL box at the top of the page, and click &ldquo;Extract Transcript&rdquo;. Transcriptly fetches available caption tracks and assembles them into clean reading paragraphs within seconds.
+              </p>
+            </details>
+
+            <details className="group rounded-2xl border border-[#F0E8E2] bg-white p-5 shadow-xs open:border-[#E9A9C3] open:bg-[#FFFDF8] transition-colors">
+              <summary className="flex cursor-pointer items-center justify-between font-semibold text-sm sm:text-base text-[#292522] list-none">
+                <span>Why are YouTube captions normally so hard to read?</span>
+                <span className="ml-4 shrink-0 transition-transform duration-200 group-open:rotate-180 text-[#77716D]">
+                  <ChevronDown className="h-4 w-4" />
+                </span>
+              </summary>
+              <p className="mt-3 text-xs sm:text-sm text-[#77716D] leading-relaxed border-t border-[#F0E8E2]/60 pt-3">
+                YouTube subtitle files are split into tiny chunks synchronized to video timing (typically 2 to 4 words per segment) without proper punctuation. Transcriptly uses speaker pause analysis to reconstruct natural sentence boundaries, creating fluent paragraphs.
+              </p>
+            </details>
+
+            <details className="group rounded-2xl border border-[#F0E8E2] bg-white p-5 shadow-xs open:border-[#E9A9C3] open:bg-[#FFFDF8] transition-colors">
+              <summary className="flex cursor-pointer items-center justify-between font-semibold text-sm sm:text-base text-[#292522] list-none">
+                <span>Does Transcriptly support non-English languages like Bangla?</span>
+                <span className="ml-4 shrink-0 transition-transform duration-200 group-open:rotate-180 text-[#77716D]">
+                  <ChevronDown className="h-4 w-4" />
+                </span>
+              </summary>
+              <p className="mt-3 text-xs sm:text-sm text-[#77716D] leading-relaxed border-t border-[#F0E8E2]/60 pt-3">
+                Yes! We support native Unicode scripts for languages such as Bangla (বাংলা), Hindi, Arabic, Spanish, French, and more. Complex conjunct characters and original punctuation are preserved verbatim.
+              </p>
+            </details>
+
+            <details className="group rounded-2xl border border-[#F0E8E2] bg-white p-5 shadow-xs open:border-[#E9A9C3] open:bg-[#FFFDF8] transition-colors">
+              <summary className="flex cursor-pointer items-center justify-between font-semibold text-sm sm:text-base text-[#292522] list-none">
+                <span>Can I save transcripts and read them as digital books?</span>
+                <span className="ml-4 shrink-0 transition-transform duration-200 group-open:rotate-180 text-[#77716D]">
+                  <ChevronDown className="h-4 w-4" />
+                </span>
+              </summary>
+              <p className="mt-3 text-xs sm:text-sm text-[#77716D] leading-relaxed border-t border-[#F0E8E2]/60 pt-3">
+                Yes. Log in or create a free account to save transcripts directly into your private library. Our digital book reader includes page-by-page reading, Sepia/Dark modes, progress tracking, and formatted PDF book downloads.
+              </p>
+            </details>
+
+            <details className="group rounded-2xl border border-[#F0E8E2] bg-white p-5 shadow-xs open:border-[#E9A9C3] open:bg-[#FFFDF8] transition-colors">
+              <summary className="flex cursor-pointer items-center justify-between font-semibold text-sm sm:text-base text-[#292522] list-none">
+                <span>Is Transcriptly free to use?</span>
+                <span className="ml-4 shrink-0 transition-transform duration-200 group-open:rotate-180 text-[#77716D]">
+                  <ChevronDown className="h-4 w-4" />
+                </span>
+              </summary>
+              <p className="mt-3 text-xs sm:text-sm text-[#77716D] leading-relaxed border-t border-[#F0E8E2]/60 pt-3">
+                Yes. Transcriptly is completely free to use. We do not require paid subscriptions or credit card information. For more answers, check our complete <Link href="/faq" className="underline font-semibold text-[#292522] hover:text-[#E9A9C3]">FAQ Page</Link>.
+              </p>
+            </details>
+          </div>
+        </section>
+      </div>
+
+      {/* Save to My Library Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-lg rounded-3xl border border-[#F0E8E2] bg-white p-6 sm:p-8 shadow-xl">
+            {savedBookId ? (
+              <div className="text-center py-4">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800">
+                  <Check className="h-6 w-6" />
+                </div>
+                <h3 className="text-lg font-bold text-[#292522]">Book Saved to Your Library!</h3>
+                <p className="mt-1 text-xs text-[#77716D]">
+                  Your transcript has been formatted and stored as a permanent digital book.
+                </p>
+
+                <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/books/${savedBookId}`)}
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-[#E9A9C3] px-5 py-2.5 text-xs font-semibold text-[#292522] hover:bg-[#DE91B1] shadow-xs cursor-pointer"
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    <span>Open in Digital Reader</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/dashboard")}
+                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 rounded-xl border border-[#F0E8E2] bg-[#FFFDF8] px-4 py-2.5 text-xs font-medium text-[#292522] hover:bg-[#FFF1B8]/60 cursor-pointer"
+                  >
+                    <span>Go to Dashboard</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowSaveModal(false)}
+                    className="text-xs text-[#77716D] hover:text-[#292522] px-2 py-1"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleConfirmSave} className="space-y-4">
+                <div className="flex items-center justify-between border-b border-[#F0E8E2] pb-3">
+                  <div className="flex items-center gap-2">
+                    <BookmarkPlus className="h-5 w-5 text-[#292522]" />
+                    <h3 className="text-base font-bold text-[#292522]">Save to My Library</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowSaveModal(false)}
+                    className="text-[#77716D] hover:text-[#292522] p-1"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {saveError && (
+                  <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 p-2.5 text-xs text-red-700">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>{saveError}</span>
+                  </div>
+                )}
+
+                {/* Video metadata badge */}
+                {result && (
+                  <div className="rounded-2xl border border-[#F0E8E2] bg-[#FFFDF8] p-3 text-xs space-y-1">
+                    <p className="font-semibold text-[#292522] line-clamp-1">
+                      {result.video_info?.title || result.video_id}
+                    </p>
+                    <div className="flex flex-wrap gap-2 text-[11px] text-[#77716D]">
+                      {result.video_info?.author && <span>Channel: {result.video_info.author}</span>}
+                      <span>•</span>
+                      <span>Language: {result.language_name}</span>
+                      <span>•</span>
+                      <span>{result.word_count} words</span>
+                      <span>•</span>
+                      <span>{result.paragraphs.length} paragraphs</span>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#77716D] mb-1.5">
+                    Suggested Book Title (Editable):
+                  </label>
+                  <input
+                    type="text"
+                    value={bookTitle}
+                    onChange={(e) => setBookTitle(e.target.value)}
+                    required
+                    placeholder="Enter book title..."
+                    className="w-full rounded-xl border border-[#F0E8E2] bg-[#FFFDF8] px-3 py-2 text-xs sm:text-sm text-[#292522] focus:outline-none focus:ring-1 focus:ring-[#E9A9C3]"
+                  />
+                  <p className="mt-1 text-[11px] text-[#77716D]">
+                    This will appear on the cover in your personal library and digital book reader.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#F0E8E2]">
+                  <button
+                    type="button"
+                    onClick={() => setShowSaveModal(false)}
+                    disabled={isSavingBook}
+                    className="rounded-xl px-3.5 py-2 text-xs font-medium text-[#77716D] hover:text-[#292522]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingBook || !bookTitle.trim()}
+                    className="flex items-center gap-1.5 rounded-xl bg-[#E9A9C3] px-4 py-2 text-xs font-semibold text-[#292522] hover:bg-[#DE91B1] shadow-xs disabled:opacity-60 cursor-pointer"
+                  >
+                    {isSavingBook ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Saving Book...</span>
+                      </>
+                    ) : (
+                      <>
+                        <BookmarkPlus className="h-3.5 w-3.5" />
+                        <span>Confirm & Save</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-[#77716D]">Loading Transcriptly...</div>}>
+      <HomePageContent />
+    </Suspense>
   );
 }

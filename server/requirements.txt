@@ -48,3 +48,9 @@ urllib3==2.8.0
 uvicorn==0.54.0
 youtube-transcript-api==1.2.4
 yt-dlp==2026.8.19
+sqlalchemy>=2.0.0
+pymysql>=1.1.0
+cryptography>=42.0.0
+pyjwt>=2.8.0
+bcrypt>=4.0.0
+reportlab>=4.0.0
