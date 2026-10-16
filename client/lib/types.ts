@@ -26,7 +26,7 @@ export interface TranscriptResponse {
   detected_language: string;
   detected_language_name: string;
   is_generated: boolean;
-  transcription_method: "youtube_captions" | "speech_recognition";
+  transcription_method: "youtube_captions" | "speech_recognition" | "browser_import" | "manual_import" | string;
   language_mode: "original" | "translate";
   target_language: string | null;
   target_language_name: string | null;
@@ -139,4 +139,32 @@ export interface SaveBookPayload {
   original_srt?: string | null;
   translated_paragraphs?: string[] | null;
   translated_segments?: TranscriptSegment[] | null;
+}
+
+export interface StageImportSegment {
+  start: number;
+  text: string;
+  duration?: number;
+}
+
+export interface StageImportPayload {
+  video_url: string;
+  title?: string;
+  channel_title?: string;
+  thumbnail_url?: string;
+  language?: string;
+  segments?: StageImportSegment[];
+  raw_text?: string;
+  paragraph_length?: ParagraphLengthMode;
+}
+
+export interface StageImportResponse {
+  import_token: string;
+  expires_in: number;
+  video_id: string;
+  title: string;
+  word_count: number;
+  segment_count: number;
+  detected_language: string;
+  detected_language_name: string;
 }

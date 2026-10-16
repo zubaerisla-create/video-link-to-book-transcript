@@ -4,9 +4,13 @@ from fastapi import APIRouter, HTTPException, Query, status
 from server.app.schemas.transcript import (
     TranscriptRequest,
     TranscriptResponse,
+    TranscriptSegment,
+    TranscriptLanguage,
     LanguagesResponse,
     VideoInfo,
     ErrorResponse,
+    StageImportRequest,
+    StageImportResponse,
 )
 from server.app.services.youtube_service import (
     extract_video_id,
@@ -15,11 +19,16 @@ from server.app.services.youtube_service import (
     fetch_raw_transcript,
     fetch_raw_transcript_with_retry,
     try_youtube_translate_track,
+    detect_script_language,
     YouTubeError,
 )
 from server.app.services.transcript_coordinator import (
     coordinator,
     sanitize_details,
+)
+from server.app.services.staging_service import (
+    staging_service,
+    parse_raw_text_to_segments,
 )
 from server.app.services.formatter_service import (
     format_transcript_paragraphs,
@@ -417,3 +426,184 @@ async def extract_transcript(payload: TranscriptRequest):
 
     # Use single-flight coordinator so duplicate concurrent requests share the same job
     return await coordinator.single_flight.execute(response_cache_key, _execute_job)
+
+
+@router.post(
+    "/transcript/stage-import",
+    response_model=StageImportResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Stage Browser-Extracted Transcript for Review and Import",
+    tags=["Transcript Import"],
+)
+async def stage_transcript_import(payload: StageImportRequest):
+    """
+    Accepts browser-extracted transcript segments or pasted text, validates URL,
+    formats paragraphs, detects language, and returns a single-use import token (TTL: 5m).
+    Does NOT save permanently to database; user confirms saving in the web reader.
+    """
+    # 1. Validate YouTube URL and extract 11-char ID
+    try:
+        vid = extract_video_id(payload.video_url)
+    except YouTubeError as ye:
+        raise HTTPException(
+            status_code=ye.status_code,
+            detail={"detail": ye.message, "code": ye.code},
+        )
+
+    # 2. Check raw_text length upfront
+    if payload.raw_text and len(payload.raw_text) > 200000:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail={
+                "detail": f"Transcript text exceeds maximum allowed size (200,000 characters). Received {len(payload.raw_text)} characters.",
+                "code": "PAYLOAD_TOO_LARGE",
+            },
+        )
+
+    # 3. Extract or parse segments
+    raw_segments: list[dict[str, Any]] = []
+    if payload.segments:
+        for s in payload.segments:
+            text_clean = s.text.strip()
+            if text_clean:
+                raw_segments.append({
+                    "start": s.start,
+                    "text": text_clean,
+                    "duration": s.duration or 3.0,
+                })
+    elif payload.raw_text and payload.raw_text.strip():
+        raw_segments = parse_raw_text_to_segments(payload.raw_text)
+
+    if not raw_segments:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"detail": "No valid transcript text or segments provided.", "code": "EMPTY_TRANSCRIPT"},
+        )
+
+    # 3. Payload size enforcement (max 200,000 characters)
+    total_chars = sum(len(s["text"]) for s in raw_segments)
+    if total_chars > 200000:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail={
+                "detail": f"Transcript text exceeds maximum allowed size (200,000 characters). Received {total_chars} characters.",
+                "code": "PAYLOAD_TOO_LARGE",
+            },
+        )
+
+    # 4. Determine title and channel metadata
+    video_title = payload.title.strip() if payload.title else None
+    channel_name = payload.channel_title.strip() if payload.channel_title else None
+    thumbnail_url = payload.thumbnail_url
+
+    if not video_title:
+        v_info = await get_video_info(vid)
+        if v_info:
+            video_title = v_info.title
+            if not channel_name:
+                channel_name = v_info.author
+            if not thumbnail_url:
+                thumbnail_url = v_info.thumbnail_url
+    if not video_title:
+        video_title = f"YouTube Video ({vid})"
+
+    # 5. Language Detection
+    sample_text = " ".join(s["text"] for s in raw_segments[:10])
+    detected_lang_code = detect_script_language(f"{video_title} {sample_text}")
+    if not detected_lang_code:
+        if payload.language and payload.language.lower() != "auto":
+            detected_lang_code = payload.language.lower().strip()
+        else:
+            detected_lang_code = "en"
+
+    detected_lang_name = get_language_display_name(detected_lang_code)
+
+    # 6. Format paragraphs
+    cleaned_segs, paragraphs, srt_content, word_count, char_count = format_transcript_paragraphs(
+        raw_segments,
+        paragraph_length=payload.paragraph_length or "medium",
+    )
+
+    available_langs = [
+        TranscriptLanguage(
+            code=detected_lang_code,
+            name=detected_lang_name,
+            is_generated=False,
+            is_translatable=True,
+        )
+    ]
+
+    video_info = VideoInfo(
+        video_id=vid,
+        title=video_title,
+        author=channel_name,
+        thumbnail_url=thumbnail_url,
+    )
+
+    transcript_resp = TranscriptResponse(
+        video_id=vid,
+        video_info=video_info,
+        language=detected_lang_code,
+        language_name=detected_lang_name,
+        detected_language=detected_lang_code,
+        detected_language_name=detected_lang_name,
+        is_generated=False,
+        transcription_method="browser_import",
+        language_mode="original",
+        available_languages=available_langs,
+        paragraphs=paragraphs,
+        segments=cleaned_segs,
+        srt=srt_content,
+        original_paragraphs=paragraphs,
+        original_segments=cleaned_segs,
+        original_srt=srt_content,
+        word_count=word_count,
+        character_count=char_count,
+        warnings=[],
+    )
+
+    # 7. Stage in memory with 5-minute single-use token
+    token, expires_in = await staging_service.stage(transcript_resp)
+    logger.info("Staged browser transcript import for video %s (words=%d, segments=%d)", vid, word_count, len(cleaned_segs))
+
+    return StageImportResponse(
+        import_token=token,
+        expires_in=expires_in,
+        video_id=vid,
+        title=video_title,
+        word_count=word_count,
+        segment_count=len(cleaned_segs),
+        detected_language=detected_lang_code,
+        detected_language_name=detected_lang_name,
+    )
+
+
+@router.get(
+    "/transcript/staged/{token}",
+    response_model=TranscriptResponse,
+    summary="Retrieve and Consume Staged Transcript Draft",
+    tags=["Transcript Import"],
+)
+async def get_staged_transcript(token: str):
+    """
+    Atomically retrieves and consumes a staged transcript draft by token.
+    The token is single-use and destroyed upon retrieval to prevent reuse.
+    """
+    if not token or len(token) < 16:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"detail": "Invalid import token format.", "code": "INVALID_TOKEN"},
+        )
+
+    # Atomically retrieves and burns the token to prevent replay
+    staged = await staging_service.get_and_consume(token)
+    if not staged:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "detail": "Import session has expired or has already been consumed. Please re-import from the Chrome extension.",
+                "code": "TOKEN_EXPIRED",
+            },
+        )
+
+    return staged

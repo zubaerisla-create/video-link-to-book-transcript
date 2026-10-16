@@ -10,6 +10,8 @@ import {
   BookDetail,
   BookListResponse,
   SaveBookPayload,
+  StageImportPayload,
+  StageImportResponse,
 } from "./types";
 
 const getApiBaseUrl = (): string => {
@@ -286,3 +288,27 @@ export function getBookPdfUrl(bookId: string): string {
 export function getBookExportUrl(bookId: string, format: "txt" | "json" | "srt"): string {
   return `${API_BASE_URL}/api/books/${encodeURIComponent(bookId)}/export/${format}`;
 }
+
+// ==========================================
+// Browser Extension Transcript Import APIs
+// ==========================================
+
+export async function stageTranscriptImportApi(
+  payload: StageImportPayload
+): Promise<StageImportResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/transcript/stage-import`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<StageImportResponse>(res);
+}
+
+export async function getStagedTranscriptApi(token: string): Promise<TranscriptResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/transcript/staged/${encodeURIComponent(token)}`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+  return handleResponse<TranscriptResponse>(res);
+}
+

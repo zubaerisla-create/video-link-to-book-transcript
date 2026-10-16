@@ -83,3 +83,31 @@ class LanguagesResponse(BaseModel):
 class ErrorResponse(BaseModel):
     detail: str
     code: str
+
+
+class StageImportSegment(BaseModel):
+    start: float = Field(..., ge=0.0, description="Start timestamp in seconds")
+    text: str = Field(..., min_length=1, max_length=2000, description="Segment text")
+    duration: Optional[float] = Field(None, ge=0.0, description="Duration in seconds")
+
+
+class StageImportRequest(BaseModel):
+    video_url: str = Field(..., min_length=5, max_length=1024, description="YouTube Video URL")
+    title: Optional[str] = Field(None, max_length=512, description="Video Title")
+    channel_title: Optional[str] = Field(None, max_length=255, description="Channel Name")
+    thumbnail_url: Optional[str] = Field(None, max_length=1024, description="Thumbnail URL")
+    language: Optional[str] = Field("auto", max_length=32, description="Language code")
+    segments: List[StageImportSegment] = Field(default_factory=list, description="Extracted transcript segments")
+    raw_text: Optional[str] = Field(None, description="Optional raw text for manual paste fallback")
+    paragraph_length: Optional[str] = Field("medium", description="Paragraph length: 'short', 'medium', or 'long'")
+
+
+class StageImportResponse(BaseModel):
+    import_token: str
+    expires_in: int = 300
+    video_id: str
+    title: str
+    word_count: int
+    segment_count: int
+    detected_language: str
+    detected_language_name: str

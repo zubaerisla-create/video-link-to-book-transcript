@@ -29,3 +29,5 @@ huggingface/
 *.db
 *.sqlite
 *.sqlite3
+data/
+

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transcriptly Importer</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-group">
+        <img src="icons/icon48.png" alt="Transcriptly Logo" class="logo-icon" />
+        <div>
+          <h1 class="brand-title">Transcriptly</h1>
+          <p class="brand-subtitle">Free Transcript Importer</p>
+        </div>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" id="tabBtnCapture" data-tab="captureTab">
+        YouTube Capture
+      </button>
+      <button class="tab-btn" id="tabBtnPaste" data-tab="pasteTab">
+        Manual Paste
+      </button>
+      <button class="tab-btn" id="tabBtnSettings" data-tab="settingsTab">
+        Settings
+      </button>
+    </nav>
+
+    <!-- Tab 1: YouTube Capture -->
+    <section id="captureTab" class="tab-content active">
+      <!-- Status Card: Not a YouTube video -->
+      <div id="notYouTubeCard" class="card hidden">
+        <div class="icon-circle warning">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+        </div>
+        <h3 class="card-title">No Active YouTube Video</h3>
+        <p class="card-desc">
+          Navigate to a YouTube video page in Google Chrome, then click this extension icon to capture its transcript.
+        </p>
+      </div>
+
+      <!-- Status Card: Scanning / Loading -->
+      <div id="scanningCard" class="card">
+        <div class="spinner"></div>
+        <h3 class="card-title">Scanning YouTube Page...</h3>
+        <p class="card-desc">Detecting video player and captions in browser DOM.</p>
+      </div>
+
+      <!-- Status Card: Panel Closed -->
+      <div id="panelClosedCard" class="card hidden">
+        <div class="icon-circle info">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+        </div>
+        <h3 class="card-title">Transcript Panel Not Open</h3>
+        <p class="card-desc" id="panelClosedMessage">
+          YouTube requires opening the transcript sidebar before captions are rendered in the browser.
+        </p>
+        <button id="btnOpenPanel" class="btn btn-secondary">
+          Try Open YouTube Transcript
+        </button>
+        <p class="helper-text">
+          If YouTube doesn't open it automatically, expand the video description and click "Show transcript", then click Re-scan.
+        </p>
+        <button id="btnRescan" class="btn btn-outline">
+          Re-scan Page
+        </button>
+      </div>
+
+      <!-- Status Card: Ready to Import -->
+      <div id="readyCard" class="card hidden">
+        <div class="video-preview-header">
+          <div class="video-meta">
+            <h3 id="previewTitle" class="video-title">Video Title</h3>
+            <p id="previewChannel" class="video-channel">Channel Name</p>
+          </div>
+        </div>
+
+        <div class="badge-row">
+          <span id="badgeSegments" class="badge">0 segments</span>
+          <span id="badgeWords" class="badge">0 words</span>
+          <span id="badgeLang" class="badge badge-accent">Original</span>
+        </div>
+
+        <div class="preview-box">
+          <div class="preview-label">Transcript Snippet:</div>
+          <div id="previewSnippet" class="snippet-content"></div>
+        </div>
+
+        <button id="btnImportCapture" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Import to Transcriptly
+        </button>
+      </div>
+    </section>
+
+    <!-- Tab 2: Manual Paste Fallback -->
+    <section id="pasteTab" class="tab-content hidden">
+      <div class="form-group">
+        <label for="pasteUrl" class="form-label">YouTube Video URL</label>
+        <input type="text" id="pasteUrl" class="form-input" placeholder="https://www.youtube.com/watch?v=..." />
+      </div>
+
+      <div class="form-group">
+        <label for="pasteTitle" class="form-label">Video Title (Optional)</label>
+        <input type="text" id="pasteTitle" class="form-input" placeholder="Enter title or leave blank to auto-detect" />
+      </div>
+
+      <div class="form-group">
+        <label for="pasteText" class="form-label">Pasted Transcript Text</label>
+        <textarea
+          id="pasteText"
+          class="form-textarea"
+          rows="7"
+          placeholder="Paste transcript here (e.g., copied from YouTube with timestamps or plain text)..."
+        ></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Formatting Style</label>
+        <div class="radio-row">
+          <label class="radio-label">
+            <input type="radio" name="pasteParagraphLength" value="short" /> Short
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="pasteParagraphLength" value="medium" checked /> Medium
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="pasteParagraphLength" value="long" /> Long
+          </label>
+        </div>
+      </div>
+
+      <button id="btnImportPaste" class="btn btn-primary">
+        Stage & Review Pasted Transcript
+      </button>
+    </section>
+
+    <!-- Tab 3: Settings -->
+    <section id="settingsTab" class="tab-content hidden">
+      <div class="form-group">
+        <label for="settingHost" class="form-label">Transcriptly Web Instance</label>
+        <input type="text" id="settingHost" class="form-input" value="https://habd.tech" />
+        <p class="helper-text">Base URL where transcripts are reviewed and saved to your library.</p>
+      </div>
+
+      <div class="preset-buttons">
+        <button type="button" class="chip-btn" data-preset="https://habd.tech">
+          Production (habd.tech)
+        </button>
+        <button type="button" class="chip-btn" data-preset="http://localhost:3000">
+          Localhost (3000)
+        </button>
+      </div>
+
+      <button id="btnSaveSettings" class="btn btn-primary" style="margin-top: 14px;">
+        Save Settings
+      </button>
+      <div id="settingsAlert" class="alert-success hidden">Settings saved!</div>
+    </section>
+
+    <!-- Global Error Banner -->
+    <div id="globalError" class="alert-error hidden"></div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>Free & Private • Captures only user-visible captions</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
