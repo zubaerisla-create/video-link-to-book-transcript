@@ -157,29 +157,7 @@ export default function ExtensionGuidePage() {
             </a>
           </div>
 
-          {/* Feature Highlights Grid */}
-          <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3 text-left">
-            <div className="rounded-2xl border border-[#F0E8E2] bg-white p-3.5 shadow-2xs">
-              <span className="text-base">⚡</span>
-              <h4 className="text-xs font-bold text-[#292522] mt-1">১-ক্লিক ইমপোর্ট</h4>
-              <p className="text-[11px] text-[#77716D] mt-0.5">ইউটিউব থেকেই সরাসরি ট্রান্সক্রিপ্ট বুক তৈরি</p>
-            </div>
-            <div className="rounded-2xl border border-[#F0E8E2] bg-white p-3.5 shadow-2xs">
-              <span className="text-base">🔒</span>
-              <h4 className="text-xs font-bold text-[#292522] mt-1">১০০% প্রাইভেট</h4>
-              <p className="text-[11px] text-[#77716D] mt-0.5">কোনো পাসওয়ার্ড, কুকি বা ট্র্যাকিং নেই</p>
-            </div>
-            <div className="rounded-2xl border border-[#F0E8E2] bg-white p-3.5 shadow-2xs">
-              <span className="text-base">🇧🇩</span>
-              <h4 className="text-xs font-bold text-[#292522] mt-1">বাংলা ও সকল ভাষা</h4>
-              <p className="text-[11px] text-[#77716D] mt-0.5">বাংলা ইউনিকোড সম্পূর্ণ নির্ভুলভাবে আসে</p>
-            </div>
-            <div className="rounded-2xl border border-[#F0E8E2] bg-white p-3.5 shadow-2xs">
-              <span className="text-base">📱</span>
-              <h4 className="text-xs font-bold text-[#292522] mt-1">মোবাইল ফ্রেন্ডলি</h4>
-              <p className="text-[11px] text-[#77716D] mt-0.5">মোবাইলে পড়ার সুবিধাজনক রিডার মোড</p>
-            </div>
-          </div>
+
         </div>
       </section>
 
