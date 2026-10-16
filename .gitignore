@@ -1,0 +1,19 @@
+# Python
+server/venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Node / Next.js
+client/node_modules/
+client/.next/
+client/out/
+
+# Environment files
+client/.env.local
+server/.env
+
+# Operating system
+.DS_Store
+*.log

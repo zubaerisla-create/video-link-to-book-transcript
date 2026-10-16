@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-bg: #FFFDF8;
+  --color-brand-pink: #F8DDE8;
+  --color-brand-pink-btn: #E9A9C3;
+  --color-brand-pink-hover: #DE91B1;
+  --color-brand-yellow: #FFF1B8;
+  --color-brand-text: #292522;
+  --color-brand-muted: #77716D;
+  --color-brand-surface: #FFFFFF;
+  --color-brand-border: #F0E8E2;
+}
+
+:root {
+  --background: #FFFDF8;
+  --foreground: #292522;
+}
+
+body {
+  background-color: #FFFDF8;
+  color: #292522;
+  font-family: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom minimal scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #F0E8E2;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #E9A9C3;
+}
+
+::selection {
+  background-color: #F8DDE8;
+  color: #292522;
+}
