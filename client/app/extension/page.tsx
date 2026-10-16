@@ -7,14 +7,9 @@ import {
   Download,
   Copy,
   Check,
-  ExternalLink,
   HelpCircle,
-  ShieldCheck,
-  Sparkles,
-  Smartphone,
   ChevronDown,
   ArrowRight,
-  BookOpen,
 } from "lucide-react";
 
 export default function ExtensionGuidePage() {
@@ -119,11 +114,7 @@ export default function ExtensionGuidePage() {
       {/* Hero Section */}
       <section className="relative overflow-hidden border-b border-[#F0E8E2] bg-linear-to-b from-[#FFF1B8]/20 via-[#FFFDF8] to-[#FFFDF8] py-12 sm:py-20 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-4xl text-center">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#E9A9C3] bg-[#F8DDE8]/50 px-4 py-1.5 text-xs font-semibold text-[#292522] mb-6">
-            <Sparkles className="h-3.5 w-3.5 text-[#292522]" />
-            <span>সহজ নির্দেশিকা • ছবি ও টেক্সটসহ স্টেপ-বাই-স্টেপ গাইড</span>
-          </div>
+
 
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-[#292522] leading-tight">
             Transcriptly Chrome Extension

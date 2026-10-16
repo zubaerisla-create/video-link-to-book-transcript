@@ -56,7 +56,7 @@ export function Footer() {
               </li>
               <li>
                 <Link href="/extension" className="hover:text-[#292522] transition-colors font-semibold text-[#7C3AED]">
-                  Chrome Extension ⚡
+                  Chrome Extension
                 </Link>
               </li>
               <li>
