@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useId, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import React, { useState, useEffect, useId } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Link as LinkIcon,
@@ -73,7 +73,6 @@ const TRANSLATION_TARGET_LANGUAGES = [
 
 function HomePageContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { isAuthenticated } = useAuth();
 
   const [url, setUrl] = useState("");
@@ -101,7 +100,9 @@ function HomePageContent() {
 
   // Restore pending save if coming back from login/signup
   useEffect(() => {
-    const shouldSave = searchParams.get("save") === "true";
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const shouldSave = params.get("save") === "true";
     if (shouldSave) {
       try {
         const raw = sessionStorage.getItem("transcriptly_pending_save");
@@ -116,7 +117,7 @@ function HomePageContent() {
         // invalid JSON
       }
     }
-  }, [searchParams]);
+  }, []);
 
   // Active view states
   const [activeTab, setActiveTab] = useState<"paragraphs" | "segments">("paragraphs");
@@ -1619,9 +1620,5 @@ function HomePageContent() {
 }
 
 export default function HomePage() {
-  return (
-    <Suspense fallback={<div className="p-8 text-center text-xs text-[#77716D]">Loading Transcriptly...</div>}>
-      <HomePageContent />
-    </Suspense>
-  );
+  return <HomePageContent />;
 }
