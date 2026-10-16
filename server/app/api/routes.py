@@ -427,6 +427,8 @@ async def extract_transcript(payload: TranscriptRequest):
     # Use single-flight coordinator so duplicate concurrent requests share the same job
     return await coordinator.single_flight.execute(response_cache_key, _execute_job)
 
+MAX_STAGE_IMPORT_CHARS = 1_000_000
+
 
 @router.post(
     "/transcript/stage-import",
@@ -450,12 +452,12 @@ async def stage_transcript_import(payload: StageImportRequest):
             detail={"detail": ye.message, "code": ye.code},
         )
 
-    # 2. Check raw_text length upfront
-    if payload.raw_text and len(payload.raw_text) > 200000:
+    # 2. Check raw_text length upfront (max 1,000,000 characters)
+    if payload.raw_text and len(payload.raw_text) > MAX_STAGE_IMPORT_CHARS:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail={
-                "detail": f"Transcript text exceeds maximum allowed size (200,000 characters). Received {len(payload.raw_text)} characters.",
+                "detail": f"Transcript text exceeds maximum allowed size ({MAX_STAGE_IMPORT_CHARS:,} characters). Received {len(payload.raw_text):,} characters.",
                 "code": "PAYLOAD_TOO_LARGE",
             },
         )
@@ -480,13 +482,13 @@ async def stage_transcript_import(payload: StageImportRequest):
             detail={"detail": "No valid transcript text or segments provided.", "code": "EMPTY_TRANSCRIPT"},
         )
 
-    # 3. Payload size enforcement (max 200,000 characters)
+    # 3. Payload size enforcement (max 1,000,000 characters)
     total_chars = sum(len(s["text"]) for s in raw_segments)
-    if total_chars > 200000:
+    if total_chars > MAX_STAGE_IMPORT_CHARS:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail={
-                "detail": f"Transcript text exceeds maximum allowed size (200,000 characters). Received {total_chars} characters.",
+                "detail": f"Transcript text exceeds maximum allowed size ({MAX_STAGE_IMPORT_CHARS:,} characters). Received {total_chars:,} characters.",
                 "code": "PAYLOAD_TOO_LARGE",
             },
         )

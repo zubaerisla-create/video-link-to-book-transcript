@@ -145,8 +145,8 @@ def test_stage_import_bangla_unicode_preservation():
 
 
 def test_stage_import_payload_size_enforcement():
-    """Verify requests exceeding 200,000 characters are rejected with HTTP 413."""
-    huge_text = "This is a sentence that is repeated to exceed the size limit. " * 3500  # > 210,000 chars
+    """Verify requests exceeding 1,000,000 characters are rejected with HTTP 413."""
+    huge_text = "This is a sentence that is repeated to exceed the size limit. " * 17000  # > 1,050,000 chars
     payload = {
         "video_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
         "raw_text": huge_text,
@@ -156,6 +156,43 @@ def test_stage_import_payload_size_enforcement():
     assert res.status_code == 413
     data = res.json()
     assert data["detail"]["code"] == "PAYLOAD_TOO_LARGE"
+
+
+def test_stage_import_large_transcript_success():
+    """Verify staging a large YouTube transcript (175 minutes / 4,897 segments / ~160k chars) succeeds."""
+    # Build a realistic 5,000 segment transcript (~175k characters)
+    large_segments = [
+        {
+            "start": round(i * 2.1, 2),
+            "text": f"Segment sentence number {i} exploring cognitive focus, neuroscience, and deep memory performance.",
+            "duration": 2.0,
+        }
+        for i in range(2500)
+    ]
+    payload = {
+        "video_url": "https://www.youtube.com/watch?v=4Vz6L8B73i4",
+        "title": "Neuroscientist's Guide To 10X Your Focus & Memory | Dr Sahar Yousef | FO559 Raj Shamani",
+        "channel_title": "Raj Shamani",
+        "segments": large_segments,
+        "paragraph_length": "medium",
+    }
+
+    res = client.post("/api/transcript/stage-import", json=payload)
+    assert res.status_code == 201
+    data = res.json()
+    assert "import_token" in data
+    assert data["segment_count"] == 2500
+    assert data["detected_language"] == "en"
+
+    # Consume and verify preview
+    token = data["import_token"]
+    res_get = client.get(f"/api/transcript/staged/{token}")
+    assert res_get.status_code == 200
+    staged = res_get.json()
+    assert staged["video_id"] == "4Vz6L8B73i4"
+    assert len(staged["segments"]) == 2500
+    assert len(staged["paragraphs"]) > 10
+    assert staged["character_count"] > 100000
 
 
 def test_stage_import_invalid_url_and_empty_payload():
