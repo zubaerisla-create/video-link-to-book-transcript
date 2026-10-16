@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="100%" height="100%" style="background:#FFFDF8; border-radius:16px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#292522" flood-opacity="0.08" />
+    </filter>
+    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E9A9C3" />
+      <stop offset="100%" stop-color="#DE91B1" />
+    </linearGradient>
+    <linearGradient id="zipGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF1B8" />
+      <stop offset="100%" stop-color="#FFE082" />
+    </linearGradient>
+  </defs>
+
+  <!-- Step Header Banner -->
+  <rect x="24" y="20" width="712" height="44" rx="10" fill="#F8DDE8" fill-opacity="0.5" stroke="#E9A9C3" stroke-width="1"/>
+  <text x="44" y="47" font-size="14" font-weight="bold" fill="#292522">ধাপ ১: জিপ (ZIP) ফাইল ডাউনলোড এবং আনজিপ (Extract) করুন</text>
+  <text x="560" y="47" font-size="12" font-weight="600" fill="#77716D">Step 1 • Download &amp; Extract</text>
+
+  <!-- Left: Download Button Card -->
+  <g transform="translate(48, 90)" filter="url(#shadow)">
+    <rect width="310" height="240" rx="16" fill="#FFFFFF" stroke="#F0E8E2" stroke-width="1.5"/>
+    <!-- Icon Circle -->
+    <circle cx="155" cy="65" r="34" fill="#FFF1B8" fill-opacity="0.6"/>
+    <path d="M155 45 v28 m-10 -10 l10 10 l10 -10 M140 85 h30" stroke="#292522" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <text x="155" y="125" text-anchor="middle" font-size="15" font-weight="bold" fill="#292522">১. ডাউনলোড বাটনে ক্লিক করুন</text>
+    <text x="155" y="146" text-anchor="middle" font-size="12" fill="#77716D">transcriptly-extension.zip (২৮ KB)</text>
+    
+    <!-- Action Button Visual -->
+    <rect x="35" y="170" width="240" height="44" rx="12" fill="url(#primaryGrad)"/>
+    <text x="155" y="197" text-anchor="middle" font-size="13" font-weight="bold" fill="#292522">⬇ Download Extension (.ZIP)</text>
+  </g>
+
+  <!-- Center Arrow -->
+  <g transform="translate(378, 195)">
+    <circle cx="10" cy="10" r="18" fill="#F8DDE8" />
+    <path d="M5 10 h12 m-5 -5 l5 5 l-5 5" stroke="#292522" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Right: Extract Folder Card -->
+  <g transform="translate(422, 90)" filter="url(#shadow)">
+    <rect width="290" height="240" rx="16" fill="#FFFFFF" stroke="#F0E8E2" stroke-width="1.5"/>
+    <!-- Folder Visual -->
+    <rect x="40" y="38" width="80" height="24" rx="4" fill="#E8DACB"/>
+    <rect x="40" y="52" width="210" height="130" rx="10" fill="url(#zipGrad)" stroke="#E8DACB" stroke-width="1.5"/>
+    
+    <!-- Files inside -->
+    <g transform="translate(56, 75)">
+      <rect width="178" height="22" rx="4" fill="#FFFFFF" fill-opacity="0.9"/>
+      <text x="12" y="15" font-size="11" font-weight="600" fill="#292522">📄 manifest.json</text>
+    </g>
+    <g transform="translate(56, 102)">
+      <rect width="178" height="22" rx="4" fill="#FFFFFF" fill-opacity="0.9"/>
+      <text x="12" y="15" font-size="11" font-weight="600" fill="#292522">🌐 popup.html &amp; popup.js</text>
+    </g>
+    <g transform="translate(56, 129)">
+      <rect width="178" height="22" rx="4" fill="#FFFFFF" fill-opacity="0.9"/>
+      <text x="12" y="15" font-size="11" font-weight="600" fill="#292522">⚡ content.js &amp; icons/</text>
+    </g>
+
+    <!-- Label -->
+    <text x="145" y="210" text-anchor="middle" font-size="12" font-weight="bold" fill="#292522">২. রাইট ক্লিক করে "Extract All" করুন</text>
+  </g>
+</svg>

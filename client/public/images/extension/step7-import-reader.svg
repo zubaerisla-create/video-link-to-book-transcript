@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="100%" height="100%" style="background:#FFFDF8; border-radius:16px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <filter id="shadow7" x="-5%" y="-5%" width="110%" height="115%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#292522" flood-opacity="0.10" />
+    </filter>
+  </defs>
+
+  <!-- Step Header Banner -->
+  <rect x="24" y="20" width="712" height="44" rx="10" fill="#F8DDE8" fill-opacity="0.5" stroke="#E9A9C3" stroke-width="1"/>
+  <text x="44" y="47" font-size="14" font-weight="bold" fill="#292522">ধাপ ৭: সম্পূর্ণ বইয়ের মতো পড়ুন, ফন্ট/থিম পরিবর্তন করুন ও PDF সেভ করুন</text>
+  <text x="560" y="47" font-size="12" font-weight="600" fill="#77716D">Step 7 • Read &amp; Export</text>
+
+  <!-- Digital Reader Surface Simulation -->
+  <g transform="translate(48, 85)" filter="url(#shadow7)">
+    <rect width="664" height="260" rx="14" fill="#FFFFFF" stroke="#E8DACB" stroke-width="1.5"/>
+    
+    <!-- Reader Top Sticky Toolbar -->
+    <rect width="664" height="50" rx="14" fill="#FAF4EC" stroke="#E8DACB" stroke-width="1"/>
+    
+    <!-- Left: Title -->
+    <rect x="20" y="10" width="80" height="30" rx="8" fill="#FFFDF8" stroke="#E8DACB"/>
+    <text x="34" y="29" font-size="11" font-weight="bold" fill="#292522">← Library</text>
+    <text x="115" y="30" font-size="13" font-weight="bold" fill="#292522">How To Build High-Scale Systems</text>
+
+    <!-- Right: Reader Controls -->
+    <!-- Font Size Pills -->
+    <g transform="translate(420, 10)">
+      <rect width="112" height="30" rx="8" fill="#FFFDF8" stroke="#E8DACB"/>
+      <rect x="30" y="3" width="26" height="24" rx="6" fill="#F8DDE8"/>
+      <text x="16" y="20" text-anchor="middle" font-size="10" font-weight="bold" fill="#77716D">SM</text>
+      <text x="43" y="20" text-anchor="middle" font-size="10" font-weight="bold" fill="#292522">MD</text>
+      <text x="70" y="20" text-anchor="middle" font-size="10" font-weight="bold" fill="#77716D">LG</text>
+      <text x="96" y="20" text-anchor="middle" font-size="10" font-weight="bold" fill="#77716D">XL</text>
+    </g>
+
+    <!-- Theme Pills -->
+    <g transform="translate(540, 10)">
+      <rect width="90" height="30" rx="8" fill="#FFFDF8" stroke="#E8DACB"/>
+      <rect x="3" y="3" width="26" height="24" rx="6" fill="#F8DDE8"/>
+      <text x="16" y="20" text-anchor="middle" font-size="12">☀️</text>
+      <text x="45" y="20" text-anchor="middle" font-size="12">☕</text>
+      <text x="74" y="20" text-anchor="middle" font-size="12">🌙</text>
+    </g>
+
+    <!-- Reader Page Content Simulation -->
+    <g transform="translate(40, 68)">
+      <!-- Paragraph 1 -->
+      <rect width="584" height="65" rx="8" fill="#FAF4EC" fill-opacity="0.4"/>
+      <text x="16" y="24" font-size="12" fill="#292522" font-family="serif">Welcome to this comprehensive engineering masterclass. In modern software architecture,</text>
+      <text x="16" y="44" font-size="12" fill="#292522" font-family="serif">building for high scale requires an understanding of caching, idempotency, and clean message flow.</text>
+
+      <!-- Paragraph 2 -->
+      <rect y="75" width="584" height="65" rx="8" fill="#FAF4EC" fill-opacity="0.4"/>
+      <text x="16" y="99" font-size="12" fill="#292522" font-family="serif">When requests enter the application layer, avoiding bottleneck states is critical. Each service</text>
+      <text x="16" y="119" font-size="12" fill="#292522" font-family="serif">must maintain isolated responsibilities with well-defined contracts and persistent logging.</text>
+    </g>
+
+    <!-- Bottom Actions Strip -->
+    <g transform="translate(40, 215)">
+      <!-- Save to Library Button -->
+      <rect width="150" height="34" rx="8" fill="#7C3AED"/>
+      <text x="75" y="22" text-anchor="middle" font-size="11" font-weight="bold" fill="#FFFFFF">💾 Save to Library</text>
+
+      <!-- Download PDF Button -->
+      <rect x="160" width="130" height="34" rx="8" fill="#FFFDF8" stroke="#E8DACB"/>
+      <text x="225" y="22" text-anchor="middle" font-size="11" font-weight="bold" fill="#292522">📄 Download PDF</text>
+
+      <!-- Download TXT Button -->
+      <rect x="300" width="110" height="34" rx="8" fill="#FFFDF8" stroke="#E8DACB"/>
+      <text x="355" y="22" text-anchor="middle" font-size="11" font-weight="bold" fill="#292522">📝 Text (TXT)</text>
+
+      <!-- Mobile Friendly Indicator -->
+      <rect x="420" width="204" height="34" rx="8" fill="#FFF1B8"/>
+      <text x="522" y="22" text-anchor="middle" font-size="11" font-weight="bold" fill="#292522">📱 মোবাইল ও পিসিতে রেসপনসিভ</text>
+    </g>
+  </g>
+</svg>

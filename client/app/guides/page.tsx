@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BookOpen, FileText, Copy, AlertCircle, GraduationCap, Clock, ArrowRight } from "lucide-react";
+import { BookOpen, FileText, Copy, AlertCircle, GraduationCap, Clock, ArrowRight, Sparkles } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "YouTube Transcript Guides & Tutorials",
@@ -12,6 +12,15 @@ export const metadata: Metadata = {
 };
 
 const GUIDES = [
+  {
+    slug: "how-to-use-chrome-extension",
+    title: "How to Install and Use Transcriptly Chrome Extension (Step-by-Step)",
+    description:
+      "A complete beginner-friendly visual guide with illustrations on installing the free Chrome extension and capturing transcripts in 1 click directly from YouTube.",
+    readTime: "3 min read",
+    icon: Sparkles,
+    category: "Featured",
+  },
   {
     slug: "how-to-get-transcript-from-youtube",
     title: "How to Get a Transcript from a YouTube Video",

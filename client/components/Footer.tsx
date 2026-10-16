@@ -55,6 +55,11 @@ export function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/extension" className="hover:text-[#292522] transition-colors font-semibold text-[#7C3AED]">
+                  Chrome Extension ⚡
+                </Link>
+              </li>
+              <li>
                 <Link href="/how-it-works" className="hover:text-[#292522] transition-colors">
                   How It Works
                 </Link>
@@ -78,6 +83,11 @@ export function Footer() {
               Popular Guides
             </h3>
             <ul className="space-y-2 text-xs text-[#77716D]">
+              <li>
+                <Link href="/guides/how-to-use-chrome-extension" className="hover:text-[#292522] transition-colors font-medium text-[#7C3AED]">
+                  Chrome Extension Guide
+                </Link>
+              </li>
               <li>
                 <Link href="/guides/how-to-get-transcript-from-youtube" className="hover:text-[#292522] transition-colors">
                   Get YouTube Transcript

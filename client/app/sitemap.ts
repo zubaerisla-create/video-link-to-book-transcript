@@ -6,8 +6,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const routes: { path: string; priority: number; changeFrequency: "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never" }[] = [
     { path: "", priority: 1.0, changeFrequency: "daily" },
+    { path: "/extension", priority: 0.9, changeFrequency: "weekly" },
     { path: "/how-it-works", priority: 0.8, changeFrequency: "weekly" },
     { path: "/guides", priority: 0.8, changeFrequency: "weekly" },
+    { path: "/guides/how-to-use-chrome-extension", priority: 0.8, changeFrequency: "weekly" },
     { path: "/guides/how-to-get-transcript-from-youtube", priority: 0.7, changeFrequency: "monthly" },
     { path: "/guides/how-to-copy-and-save-youtube-captions", priority: 0.7, changeFrequency: "monthly" },
     { path: "/guides/how-to-fix-missing-unavailable-captions", priority: 0.7, changeFrequency: "monthly" },

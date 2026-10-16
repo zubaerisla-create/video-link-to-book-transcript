@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="100%" height="100%" style="background:#FFFDF8; border-radius:16px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <filter id="shadow3" x="-5%" y="-5%" width="110%" height="115%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#292522" flood-opacity="0.08" />
+    </filter>
+  </defs>
+
+  <!-- Step Header Banner -->
+  <rect x="24" y="20" width="712" height="44" rx="10" fill="#F8DDE8" fill-opacity="0.5" stroke="#E9A9C3" stroke-width="1"/>
+  <text x="44" y="47" font-size="14" font-weight="bold" fill="#292522">ধাপ ৩: উপরে ডান কোণায় "Developer mode" সুইচটি চালু (ON) করুন</text>
+  <text x="540" y="47" font-size="12" font-weight="600" fill="#77716D">Step 3 • Enable Developer Mode</text>
+
+  <!-- Chrome Extensions Manager Header Simulation -->
+  <g transform="translate(48, 85)" filter="url(#shadow3)">
+    <rect width="664" height="260" rx="14" fill="#FFFFFF" stroke="#E8DACB" stroke-width="1.5"/>
+    
+    <!-- Extensions Page Header Bar -->
+    <rect width="664" height="60" rx="14" fill="#FFFFFF" stroke="#F0E8E2" stroke-width="1"/>
+    
+    <!-- Left: Extensions title -->
+    <text x="28" y="36" font-size="17" font-weight="bold" fill="#292522">Extensions</text>
+    <rect x="130" y="16" width="220" height="28" rx="6" fill="#F5EBE1" fill-opacity="0.6"/>
+    <text x="145" y="34" font-size="11" fill="#77716D">🔍 Search extensions</text>
+
+    <!-- RIGHT: Developer Mode Highlighted Box -->
+    <g transform="translate(435, 12)">
+      <!-- Pulsing Highlight Box -->
+      <rect width="215" height="36" rx="8" fill="#FFF1B8" fill-opacity="0.5" stroke="#E9A9C3" stroke-width="2"/>
+      
+      <text x="16" y="23" font-size="13" font-weight="bold" fill="#292522">Developer mode</text>
+      
+      <!-- Toggle Switch (ON State) -->
+      <g transform="translate(145, 6)">
+        <rect width="50" height="24" rx="12" fill="#7C3AED"/>
+        <circle cx="38" cy="12" r="9" fill="#FFFFFF"/>
+        <path d="M35 12 l2 2 l4 -4" stroke="#7C3AED" stroke-width="1.8" fill="none"/>
+      </g>
+    </g>
+
+    <!-- Visual Pointer / Attention Callout -->
+    <g transform="translate(480, 75)">
+      <!-- Speech Bubble -->
+      <rect width="170" height="42" rx="8" fill="#292522"/>
+      <path d="M110 0 l-8 -12 l-8 12 Z" fill="#292522"/>
+      <text x="85" y="22" text-anchor="middle" font-size="12" font-weight="bold" fill="#FFFFFF">👆 এটি ক্লিক করে ON করুন</text>
+      <text x="85" y="35" text-anchor="middle" font-size="10" fill="#E9A9C3">Toggle switch to ON</text>
+    </g>
+
+    <!-- Explanation Box -->
+    <g transform="translate(28, 145)">
+      <rect width="608" height="90" rx="12" fill="#FAF4EC" stroke="#E8DACB" stroke-width="1"/>
+      <circle cx="36" cy="35" r="16" fill="#FFF1B8"/>
+      <text x="36" y="40" text-anchor="middle" font-size="14">ℹ️</text>
+      <text x="64" y="32" font-size="13" font-weight="bold" fill="#292522">কেন Developer Mode অন করবেন?</text>
+      <text x="64" y="52" font-size="12" fill="#433422">ক্রোম ব্রাউজারে অফিশিয়াল স্টোরের বাইরে নিজস্ব কাস্টম এক্সটেনশন লোড করার জন্য এই মোডটি চালু করতে হয়।</text>
+      <text x="64" y="70" font-size="12" fill="#77716D">এটি সম্পুর্ণ নিরাপদ এবং গুগল ক্রোমের একটি অফিশিয়াল বিল্ট-ইন ফিচার।</text>
+    </g>
+  </g>
+</svg>

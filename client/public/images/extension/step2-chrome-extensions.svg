@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="100%" height="100%" style="background:#FFFDF8; border-radius:16px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <filter id="shadow2" x="-5%" y="-5%" width="110%" height="115%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#292522" flood-opacity="0.08" />
+    </filter>
+  </defs>
+
+  <!-- Step Header Banner -->
+  <rect x="24" y="20" width="712" height="44" rx="10" fill="#F8DDE8" fill-opacity="0.5" stroke="#E9A9C3" stroke-width="1"/>
+  <text x="44" y="47" font-size="14" font-weight="bold" fill="#292522">ধাপ ২: ক্রোম ব্রাউজারে chrome://extensions লিখে এন্টার চাপুন</text>
+  <text x="560" y="47" font-size="12" font-weight="600" fill="#77716D">Step 2 • Open Extensions</text>
+
+  <!-- Browser Window Simulation -->
+  <g transform="translate(48, 85)" filter="url(#shadow2)">
+    <!-- Browser Chrome Frame -->
+    <rect width="664" height="260" rx="14" fill="#FFFFFF" stroke="#E8DACB" stroke-width="1.5"/>
+    
+    <!-- Titlebar / Tabs Bar -->
+    <rect width="664" height="42" rx="14" fill="#F5EBE1" fill-opacity="0.7"/>
+    <circle cx="24" cy="21" r="5" fill="#FF5F56"/>
+    <circle cx="40" cy="21" r="5" fill="#FFBD2E"/>
+    <circle cx="56" cy="21" r="5" fill="#27C93F"/>
+
+    <!-- New Tab -->
+    <rect x="80" y="8" width="160" height="34" rx="8" fill="#FFFFFF"/>
+    <text x="105" y="29" font-size="12" font-weight="600" fill="#292522">Extensions</text>
+
+    <!-- Address Bar Area -->
+    <rect x="16" y="52" width="632" height="44" rx="10" fill="#FFFDF8" stroke="#F0E8E2" stroke-width="1.5"/>
+    
+    <!-- Nav Icons -->
+    <path d="M36 74 l-6 -6 l6 -6 M30 68 h14" stroke="#77716D" stroke-width="2" stroke-linecap="round"/>
+    <path d="M62 68 a6 6 0 1 1 0 5" fill="none" stroke="#77716D" stroke-width="2"/>
+
+    <!-- Address Input Box with Highlight -->
+    <rect x="85" y="58" width="480" height="32" rx="8" fill="#FFF1B8" fill-opacity="0.4" stroke="#E9A9C3" stroke-width="1.5"/>
+    <text x="100" y="79" font-size="14" font-family="monospace" font-weight="bold" fill="#292522">chrome://extensions</text>
+    <rect x="250" y="66" width="2" height="16" fill="#292522">
+      <animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite"/>
+    </rect>
+
+    <!-- Enter Key Indicator -->
+    <g transform="translate(575, 62)">
+      <rect width="64" height="24" rx="6" fill="#292522"/>
+      <text x="32" y="16" text-anchor="middle" font-size="10" font-weight="bold" fill="#FFFFFF">↵ ENTER</text>
+    </g>
+
+    <!-- Instruction Help Box inside browser page -->
+    <rect x="60" y="125" width="544" height="95" rx="12" fill="#F8DDE8" fill-opacity="0.3" stroke="#E9A9C3" stroke-width="1"/>
+    <text x="85" y="155" font-size="14" font-weight="bold" fill="#292522">💡 অন্যান্য ব্রাউজারের ক্ষেত্রে:</text>
+    <text x="85" y="180" font-size="13" fill="#433422">• <tspan font-weight="bold">Brave Browser:</tspan> brave://extensions লিখে এন্টার চাপুন</text>
+    <text x="85" y="202" font-size="13" fill="#433422">• <tspan font-weight="bold">Microsoft Edge:</tspan> edge://extensions লিখে এন্টার চাপুন</text>
+  </g>
+</svg>
