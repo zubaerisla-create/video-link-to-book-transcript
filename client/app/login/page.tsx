@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LogIn, AlertCircle, ArrowRight, BookOpen, KeyRound } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { ApiError } from "@/lib/api";
+import { ApiError, forgotPasswordApi } from "@/lib/api";
 
 function LoginForm() {
   const router = useRouter();
@@ -23,6 +23,8 @@ function LoginForm() {
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSubmitted, setForgotSubmitted] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,10 +55,19 @@ function LoginForm() {
     }
   };
 
-  const handleForgotSubmit = (e: React.FormEvent) => {
+  const handleForgotSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!forgotEmail.trim()) return;
-    setForgotSubmitted(true);
+    setForgotError(null);
+    setForgotLoading(true);
+    try {
+      await forgotPasswordApi(forgotEmail.trim());
+      setForgotSubmitted(true);
+    } catch (err: any) {
+      setForgotError(err.message || "Failed to send reset instructions.");
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
   return (
@@ -192,27 +203,35 @@ function LoginForm() {
                 <p className="text-xs text-[#77716D]">
                   Enter your email address and we will provide a secure recovery link.
                 </p>
+                {forgotError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700">
+                    {forgotError}
+                  </div>
+                )}
                 <input
                   type="email"
                   value={forgotEmail}
                   onChange={(e) => setForgotEmail(e.target.value)}
                   placeholder="you@example.com"
                   required
-                  className="w-full rounded-xl border border-[#F0E8E2] bg-[#FFFDF8] px-3 py-2 text-xs text-[#292522]"
+                  disabled={forgotLoading}
+                  className="w-full rounded-xl border border-[#F0E8E2] bg-[#FFFDF8] px-3 py-2 text-xs text-[#292522] disabled:opacity-60"
                 />
                 <div className="flex items-center justify-end gap-2 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowForgot(false)}
-                    className="rounded-xl px-3 py-1.5 text-xs text-[#77716D]"
+                    disabled={forgotLoading}
+                    className="rounded-xl px-3 py-1.5 text-xs text-[#77716D] disabled:opacity-60"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="rounded-xl bg-[#E9A9C3] px-3.5 py-1.5 text-xs font-semibold text-[#292522] hover:bg-[#DE91B1]"
+                    disabled={forgotLoading}
+                    className="rounded-xl bg-[#E9A9C3] px-3.5 py-1.5 text-xs font-semibold text-[#292522] hover:bg-[#DE91B1] disabled:opacity-60 cursor-pointer"
                   >
-                    Send Instructions
+                    {forgotLoading ? "Sending..." : "Send Instructions"}
                   </button>
                 </div>
               </form>

@@ -31,5 +31,7 @@ huggingface/
 *.sqlite3
 data/
 backups/
-scripts/
+/scripts/
+!server/scripts/
+
 

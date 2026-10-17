@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, asc
 
 from server.app.db.database import get_db
-from server.app.db.models import User, Book, BookContent
+from server.app.db.models import User, Book, BookContent, ReadingSession, get_utc_now
 from server.app.auth.security import get_current_user
 from server.app.schemas.book import (
     SaveBookRequest,
@@ -20,6 +20,7 @@ from server.app.schemas.book import (
     BookListResponse,
 )
 from server.app.services.pdf_service import generate_book_pdf
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger("transcriptly.books")
 router = APIRouter(prefix="/books", tags=["Books & Library"])
@@ -118,6 +119,30 @@ def save_book(
     db.refresh(new_book)
 
     logger.info("Book saved: '%s' (id=%s) by user %s", new_book.title, new_book.id, current_user.email)
+
+    # Server-side analytics events
+    try:
+        from server.app.services.analytics_service import record_event
+        record_event(
+            db=db,
+            event_type="book_created",
+            visitor_id=current_user.id,
+            session_id=current_user.id,
+            user_id=current_user.id,
+            page_path="/books",
+            metadata={"video_id": new_book.video_id, "word_count": new_book.word_count, "language": new_book.language},
+        )
+        record_event(
+            db=db,
+            event_type="import_success",
+            visitor_id=current_user.id,
+            session_id=current_user.id,
+            user_id=current_user.id,
+            page_path="/import",
+            metadata={"video_id": new_book.video_id},
+        )
+    except Exception as e:
+        logger.warning("Failed to record book_created analytics event: %s", e)
 
     return BookDetail(
         id=new_book.id,
@@ -429,3 +454,207 @@ def export_book(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"detail": f"Unsupported format: {format_type}. Allowed: txt, srt, json", "code": "INVALID_FORMAT"},
         )
+
+
+# ==================== Book Reading Time & Session Tracking ====================
+
+class ReadingSessionStartRequest(BaseModel):
+    session_id: str = Field(..., min_length=8, max_length=64, description="Unique client reading session UUID")
+    last_page_read: Optional[int] = Field(1, ge=1)
+    reading_progress: Optional[float] = Field(0.0, ge=0.0, le=100.0)
+    device_type: Optional[str] = Field("desktop", max_length=32)
+
+
+class ReadingSessionHeartbeatRequest(BaseModel):
+    session_id: str = Field(..., min_length=8, max_length=64)
+    active_seconds: int = Field(..., ge=0, le=120, description="Active seconds measured during interval")
+    last_page_read: Optional[int] = Field(1, ge=1)
+    reading_progress: Optional[float] = Field(0.0, ge=0.0, le=100.0)
+
+
+class ReadingSessionEndRequest(BaseModel):
+    session_id: str = Field(..., min_length=8, max_length=64)
+    final_active_seconds: Optional[int] = Field(0, ge=0, le=120)
+    last_page_read: Optional[int] = Field(None, ge=1)
+    reading_progress: Optional[float] = Field(None, ge=0.0, le=100.0)
+
+
+@router.post(
+    "/{book_id}/reading/start",
+    status_code=status.HTTP_200_OK,
+    summary="Start or Resume an Active Reading Session",
+)
+def start_reading_session(
+    book_id: str,
+    payload: ReadingSessionStartRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Starts or resumes an active reading session for an authenticated user.
+    Guarantees user ownership and prevents double-counting.
+    """
+    book = db.query(Book).filter(Book.id == book_id, Book.user_id == current_user.id).first()
+    if not book:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"detail": "Book not found or unauthorized.", "code": "BOOK_NOT_FOUND"},
+        )
+
+    # Check for existing session with this session_id
+    session = (
+        db.query(ReadingSession)
+        .filter(
+            ReadingSession.session_id == payload.session_id,
+            ReadingSession.user_id == current_user.id,
+            ReadingSession.book_id == book.id,
+        )
+        .first()
+    )
+
+    now = get_utc_now()
+    if session:
+        session.is_active = True
+        session.last_heartbeat_at = now
+        session.updated_at = now
+    else:
+        clean_device = (payload.device_type or "desktop").strip().lower()[:32]
+        session = ReadingSession(
+            session_id=payload.session_id,
+            user_id=current_user.id,
+            book_id=book.id,
+            start_time=now,
+            last_heartbeat_at=now,
+            duration_seconds=0,
+            last_page_read=payload.last_page_read or book.last_page_read or 1,
+            reading_progress=payload.reading_progress or book.reading_progress or 0.0,
+            is_active=True,
+            device_type=clean_device if clean_device in ("desktop", "mobile", "tablet") else "desktop",
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(session)
+
+    db.commit()
+    db.refresh(session)
+
+    return {
+        "session_id": session.session_id,
+        "status": "active",
+        "duration_seconds": session.duration_seconds,
+        "book_id": book.id,
+    }
+
+
+@router.post(
+    "/{book_id}/reading/heartbeat",
+    status_code=status.HTTP_200_OK,
+    summary="Record Verified Active Reading Heartbeat",
+)
+def record_reading_heartbeat(
+    book_id: str,
+    payload: ReadingSessionHeartbeatRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Records verified active reading seconds from the reader interface.
+    Caps duration per heartbeat interval to prevent forgery or background inflation.
+    """
+    session = (
+        db.query(ReadingSession)
+        .filter(
+            ReadingSession.session_id == payload.session_id,
+            ReadingSession.user_id == current_user.id,
+            ReadingSession.book_id == book_id,
+        )
+        .first()
+    )
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"detail": "Active reading session not found.", "code": "SESSION_NOT_FOUND"},
+        )
+
+    # Server-side safety cap: maximum 60 seconds per single heartbeat call
+    active_increment = min(payload.active_seconds, 60)
+    now = get_utc_now()
+
+    session.duration_seconds += active_increment
+    session.last_heartbeat_at = now
+    session.is_active = True
+    session.updated_at = now
+
+    if payload.last_page_read and payload.last_page_read >= 1:
+        session.last_page_read = payload.last_page_read
+    if payload.reading_progress is not None:
+        session.reading_progress = min(100.0, max(0.0, payload.reading_progress))
+
+    # Keep book progress in sync
+    book = db.query(Book).filter(Book.id == book_id, Book.user_id == current_user.id).first()
+    if book:
+        if payload.last_page_read and payload.last_page_read >= 1:
+            book.last_page_read = payload.last_page_read
+        if payload.reading_progress is not None:
+            book.reading_progress = min(100.0, max(0.0, payload.reading_progress))
+        book.updated_at = now
+
+    db.commit()
+
+    return {
+        "session_id": session.session_id,
+        "status": "active",
+        "total_active_seconds": session.duration_seconds,
+        "last_page_read": session.last_page_read,
+        "reading_progress": session.reading_progress,
+    }
+
+
+@router.post(
+    "/{book_id}/reading/end",
+    status_code=status.HTTP_200_OK,
+    summary="End Active Reading Session Safely",
+)
+def end_reading_session(
+    book_id: str,
+    payload: ReadingSessionEndRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Safely flushes and ends an active reading session.
+    Invoked when leaving the reader, closing tab, or on session timeout.
+    """
+    session = (
+        db.query(ReadingSession)
+        .filter(
+            ReadingSession.session_id == payload.session_id,
+            ReadingSession.user_id == current_user.id,
+            ReadingSession.book_id == book_id,
+        )
+        .first()
+    )
+    if not session:
+        return {"status": "session_already_closed", "total_active_seconds": 0}
+
+    final_increment = min(payload.final_active_seconds or 0, 60)
+    now = get_utc_now()
+
+    session.duration_seconds += final_increment
+    session.end_time = now
+    session.last_heartbeat_at = now
+    session.is_active = False
+    session.updated_at = now
+
+    if payload.last_page_read and payload.last_page_read >= 1:
+        session.last_page_read = payload.last_page_read
+    if payload.reading_progress is not None:
+        session.reading_progress = min(100.0, max(0.0, payload.reading_progress))
+
+    db.commit()
+
+    return {
+        "session_id": session.session_id,
+        "status": "ended",
+        "total_active_seconds": session.duration_seconds,
+    }

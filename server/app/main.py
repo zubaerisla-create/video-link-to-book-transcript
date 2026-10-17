@@ -9,9 +9,13 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from server.app.config import settings
 from server.app.db.database import init_db
+from server.app.db.migrations import run_database_migrations
 from server.app.api.routes import router as transcript_router
 from server.app.api.auth import router as auth_router
 from server.app.api.books import router as books_router
+from server.app.api.analytics import router as analytics_router
+from server.app.api.admin import router as admin_router
+from server.app.api.dictionary import router as dictionary_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("transcriptly")
@@ -19,11 +23,12 @@ logger = logging.getLogger("transcriptly")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize database tables on application startup
+    # Initialize database tables and apply safe migrations on application startup
     try:
         logger.info("Initializing database schema...")
         init_db()
-        logger.info("Database schema initialized successfully.")
+        run_database_migrations()
+        logger.info("Database schema initialized and verified successfully.")
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}", exc_info=True)
     yield
@@ -43,6 +48,8 @@ def extract_client_ip(request: Request) -> str:
 
 # In-memory rate limiter per IP with strict limits on auth
 class RateLimitMiddleware(BaseHTTPMiddleware):
+    instance = None
+
     def __init__(
         self,
         app,
@@ -56,6 +63,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.window_seconds = window_seconds
         self.ip_records = defaultdict(list)
         self.auth_ip_records = defaultdict(list)
+        RateLimitMiddleware.instance = self
 
     async def dispatch(self, request: Request, call_next):
         # Allow health check without rate limit
@@ -67,7 +75,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         now = time.time()
 
         # Stricter rate limit on auth endpoints (brute force mitigation)
-        if path in ("/api/auth/login", "/api/auth/signup"):
+        if path in (
+            "/api/auth/login",
+            "/api/auth/signup",
+            "/api/auth/forgot-password",
+            "/api/auth/reset-password",
+        ):
             auth_timestamps = [
                 t for t in self.auth_ip_records[client_ip] if now - t < self.window_seconds
             ]
@@ -106,6 +119,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.ip_records[client_ip] = valid_timestamps
         response = await call_next(request)
         return response
+
+
+def reset_rate_limiter():
+    """Resets in-memory rate limit counters for testing."""
+    if RateLimitMiddleware.instance:
+        RateLimitMiddleware.instance.ip_records.clear()
+        RateLimitMiddleware.instance.auth_ip_records.clear()
 
 
 app = FastAPI(
@@ -153,3 +173,6 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(transcript_router)
 app.include_router(auth_router, prefix="/api")
 app.include_router(books_router, prefix="/api")
+app.include_router(analytics_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
+app.include_router(dictionary_router, prefix="/api")

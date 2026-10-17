@@ -24,12 +24,27 @@ class ForgotPasswordRequest(BaseModel):
     email: str = Field(..., description="Registered email address")
 
 
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(..., description="Password reset token received via email")
+    new_password: str = Field(..., min_length=8, max_length=128, description="New account password")
+    confirm_password: str = Field(..., min_length=8, max_length=128, description="Confirm new password")
+
+    @model_validator(mode="after")
+    def check_passwords_match(self):
+        if self.new_password != self.confirm_password:
+            raise ValueError("Passwords do not match.")
+        return self
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
     email: str
     full_name: str
+    is_active: bool = True
+    role: str = "user"
+    is_admin: bool = False
     created_at: datetime
 
 

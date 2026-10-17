@@ -87,6 +87,14 @@ class Settings(BaseModel):
     TRANSCRIPT_INITIAL_BACKOFF_SECONDS: float = float(os.getenv("TRANSCRIPT_INITIAL_BACKOFF_SECONDS", "1.0"))
     TRANSCRIPT_MAX_BACKOFF_SECONDS: float = float(os.getenv("TRANSCRIPT_MAX_BACKOFF_SECONDS", "8.0"))
 
+    # SMTP Email Settings (Gmail)
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "465"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://habd.tech")
+
 
 settings = Settings()
 

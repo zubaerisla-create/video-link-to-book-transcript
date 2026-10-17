@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, use } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   BookOpen,
+  Bookmark,
   Search,
   Sliders,
   Type,
@@ -28,11 +29,15 @@ import { useAuth } from "@/lib/auth-context";
 import {
   getBookApi,
   updateProgressApi,
+  startReadingSessionApi,
+  heartbeatReadingSessionApi,
+  endReadingSessionApi,
   getBookPdfUrl,
   getBookExportUrl,
   ApiError,
 } from "@/lib/api";
 import { BookDetail } from "@/lib/types";
+import { WordTranslationPopup } from "@/components/reader/WordTranslationPopup";
 
 interface ReaderPageProps {
   params: Promise<{ id: string }>;
@@ -101,6 +106,116 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showExportMenu, setShowExportMenu] = useState(false);
 
+  // Word Selection & Translation Popup State
+  const readerContentRef = useRef<HTMLDivElement>(null);
+  const [selectedWord, setSelectedWord] = useState<string | null>(null);
+  const [popupPosition, setPopupPosition] = useState<{
+    top: number;
+    left: number;
+    placement: "top" | "bottom";
+  } | null>(null);
+
+  const handleClosePopup = useCallback(() => {
+    setSelectedWord(null);
+    setPopupPosition(null);
+  }, []);
+
+  const cleanWordSelection = (raw: string): string => {
+    return raw.trim().replace(/^[\s“"'‘«(\[{<]+|[\s”"'’».,;:!?)}\]>]+$/g, "");
+  };
+
+  const handleSelection = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || !selection.rangeCount) {
+      return;
+    }
+
+    const rawSelected = selection.toString();
+    if (!rawSelected || !rawSelected.trim()) return;
+
+    // Reject multi-line or long selections
+    if (rawSelected.includes("\n") || rawSelected.length > 60) return;
+
+    const cleaned = cleanWordSelection(rawSelected);
+    if (!cleaned || cleaned.length < 1 || cleaned.length > 50) return;
+
+    // Single-word only: reject if internal spaces
+    if (/\s/.test(cleaned)) return;
+
+    // Must contain alphabetic characters
+    if (!/[a-zA-Z]/.test(cleaned)) return;
+
+    // Must be inside reader container
+    const range = selection.getRangeAt(0);
+    const container = readerContentRef.current;
+    if (!container || !container.contains(range.commonAncestorContainer)) {
+      return;
+    }
+
+    const rect = range.getBoundingClientRect();
+    if (!rect || (rect.width === 0 && rect.height === 0)) return;
+
+    const popupWidth = Math.min(320, window.innerWidth - 32);
+    const popupHeight = 280;
+
+    let left = rect.left + rect.width / 2 - popupWidth / 2;
+    left = Math.max(16, Math.min(window.innerWidth - popupWidth - 16, left));
+
+    let top = rect.bottom + 8;
+    let placement: "top" | "bottom" = "bottom";
+
+    if (top + popupHeight > window.innerHeight - 16 && rect.top - popupHeight - 8 > 16) {
+      top = rect.top - popupHeight - 8;
+      placement = "top";
+    }
+
+    setSelectedWord(cleaned);
+    setPopupPosition({ top, left, placement });
+  }, []);
+
+  // Listen for selection events and cleanup
+  useEffect(() => {
+    const onMouseUp = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && target.closest("[role='dialog']")) return;
+      setTimeout(handleSelection, 10);
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && target.closest("[role='dialog']")) return;
+      setTimeout(handleSelection, 50);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleClosePopup();
+      }
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && target.closest("[role='dialog']")) return;
+      if (selectedWord) {
+        handleClosePopup();
+      }
+    };
+
+    document.addEventListener("mouseup", onMouseUp);
+    document.addEventListener("touchend", onTouchEnd);
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", onMouseDown);
+
+    return () => {
+      document.removeEventListener("mouseup", onMouseUp);
+      document.removeEventListener("touchend", onTouchEnd);
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onMouseDown);
+    };
+  }, [handleSelection, handleClosePopup, selectedWord]);
+
   // Load Book
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -162,8 +277,144 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
     }
   };
 
+  // Active Reading Time Tracking Instrumentation
+  const readingSessionIdRef = useRef<string | null>(null);
+  const accumulatedSecondsRef = useRef<number>(0);
+  const lastActiveTimeRef = useRef<number>(Date.now());
+  const isTabVisibleRef = useRef<boolean>(true);
+  const currentPageRef = useRef<number>(currentPage);
+  const totalPagesRef = useRef<number>(totalPages);
+
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+  }, [currentPage]);
+
+  useEffect(() => {
+    totalPagesRef.current = totalPages;
+  }, [totalPages]);
+
+  useEffect(() => {
+    if (!book || !isAuthenticated) return;
+
+    // Start a new reading session
+    const uniqueSessionId = `read-${book.id}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    readingSessionIdRef.current = uniqueSessionId;
+    accumulatedSecondsRef.current = 0;
+    lastActiveTimeRef.current = Date.now();
+    isTabVisibleRef.current = typeof document !== "undefined" ? !document.hidden : true;
+
+    const deviceType =
+      typeof window !== "undefined"
+        ? window.innerWidth <= 768
+          ? "mobile"
+          : window.innerWidth <= 1024
+          ? "tablet"
+          : "desktop"
+        : "desktop";
+
+    const initialProgress = Math.min(
+      100,
+      Math.round((currentPageRef.current / (totalPagesRef.current || 1)) * 100)
+    );
+
+    startReadingSessionApi(book.id, {
+      session_id: uniqueSessionId,
+      last_page_read: currentPageRef.current,
+      reading_progress: initialProgress,
+      device_type: deviceType,
+    }).catch(() => {
+      // Non-critical background session start
+    });
+
+    // 1-second active timer tick with 60s idle timeout & visibility checks
+    const timerInterval = setInterval(() => {
+      const now = Date.now();
+      const idleMs = now - lastActiveTimeRef.current;
+      const isIdle = idleMs > 60000; // 60s idle threshold
+      const isVisible = isTabVisibleRef.current && (typeof document !== "undefined" ? !document.hidden : true);
+
+      if (isVisible && !isIdle) {
+        accumulatedSecondsRef.current += 1;
+      }
+
+      // Flush heartbeat every 30 seconds of active reading
+      if (accumulatedSecondsRef.current >= 30) {
+        const toFlush = Math.min(accumulatedSecondsRef.current, 60);
+        accumulatedSecondsRef.current = 0;
+        const curP = currentPageRef.current;
+        const totP = totalPagesRef.current || 1;
+        const prog = Math.min(100, Math.round((curP / totP) * 100));
+
+        heartbeatReadingSessionApi(book.id, {
+          session_id: uniqueSessionId,
+          active_seconds: toFlush,
+          last_page_read: curP,
+          reading_progress: prog,
+        }).catch(() => {});
+      }
+    }, 1000);
+
+    const onUserActivity = () => {
+      lastActiveTimeRef.current = Date.now();
+    };
+
+    const onVisibilityChange = () => {
+      if (typeof document !== "undefined") {
+        isTabVisibleRef.current = !document.hidden;
+        if (!document.hidden) {
+          lastActiveTimeRef.current = Date.now();
+        }
+      }
+    };
+
+    const flushRemainingSession = () => {
+      if (!readingSessionIdRef.current) return;
+      const remainingSeconds = Math.min(accumulatedSecondsRef.current, 60);
+      const curP = currentPageRef.current;
+      const totP = totalPagesRef.current || 1;
+      const prog = Math.min(100, Math.round((curP / totP) * 100));
+
+      endReadingSessionApi(
+        book.id,
+        {
+          session_id: readingSessionIdRef.current,
+          final_active_seconds: remainingSeconds,
+          last_page_read: curP,
+          reading_progress: prog,
+        },
+        true // use keepalive: true to survive tab navigation / unload
+      ).catch(() => {});
+
+      readingSessionIdRef.current = null;
+      accumulatedSecondsRef.current = 0;
+    };
+
+    window.addEventListener("mousemove", onUserActivity, { passive: true });
+    window.addEventListener("scroll", onUserActivity, { passive: true });
+    window.addEventListener("keydown", onUserActivity, { passive: true });
+    window.addEventListener("touchstart", onUserActivity, { passive: true });
+    window.addEventListener("click", onUserActivity, { passive: true });
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", flushRemainingSession);
+    window.addEventListener("beforeunload", flushRemainingSession);
+
+    return () => {
+      clearInterval(timerInterval);
+      window.removeEventListener("mousemove", onUserActivity);
+      window.removeEventListener("scroll", onUserActivity);
+      window.removeEventListener("keydown", onUserActivity);
+      window.removeEventListener("touchstart", onUserActivity);
+      window.removeEventListener("click", onUserActivity);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", flushRemainingSession);
+      window.removeEventListener("beforeunload", flushRemainingSession);
+      flushRemainingSession();
+    };
+  }, [book?.id, isAuthenticated]);
+
   const handlePrevPage = () => {
     if (currentPage > 1) {
+      handleClosePopup();
       const prev = currentPage - 1;
       setCurrentPage(prev);
       saveReadingProgress(prev);
@@ -173,6 +424,7 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
 
   const handleNextPage = () => {
     if (currentPage < totalPages) {
+      handleClosePopup();
       const next = currentPage + 1;
       setCurrentPage(next);
       saveReadingProgress(next);
@@ -332,6 +584,16 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
                   </button>
                 )}
               </div>
+
+              {/* My Dictionary Link */}
+              <Link
+                href="/dictionary"
+                title="Open My Personal Dictionary"
+                className={`flex items-center gap-1 rounded-xl border ${themeStyles.border} ${themeStyles.buttonBg} p-1.5 sm:p-2 text-xs font-medium ${themeStyles.text} transition-colors`}
+              >
+                <Bookmark className="h-3.5 w-3.5 text-[#E9A9C3]" />
+                <span className="hidden md:inline">Dictionary</span>
+              </Link>
 
               {/* Mode Toggle: Page by Page vs Continuous */}
               <button
@@ -531,8 +793,9 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
 
         {/* Reader Book Surface */}
         <div
+          ref={readerContentRef}
           dir={isRtl ? "rtl" : "ltr"}
-          className={`rounded-3xl border ${themeStyles.border} ${themeStyles.cardBg} p-6 sm:p-12 shadow-sm transition-colors duration-150 min-h-[500px]`}
+          className={`rounded-3xl border ${themeStyles.border} ${themeStyles.cardBg} p-6 sm:p-12 shadow-sm transition-colors duration-150 min-h-[500px] select-text`}
         >
           {isContinuous ? (
             /* Continuous Scrolling Mode */
@@ -604,6 +867,18 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
+        )}
+
+        {/* Word Translation Contextual Popup */}
+        {selectedWord && popupPosition && (
+          <WordTranslationPopup
+            word={selectedWord}
+            position={popupPosition}
+            theme={theme}
+            bookId={book.id}
+            bookTitle={book.title}
+            onClose={handleClosePopup}
+          />
         )}
       </main>
     </div>

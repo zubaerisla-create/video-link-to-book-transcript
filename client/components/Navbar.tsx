@@ -16,7 +16,12 @@ export function Navbar() {
 
   const navLinks = [
     { href: "/", label: "Home" },
-    ...(isAuthenticated ? [{ href: "/dashboard", label: "My Library" }] : []),
+    ...(isAuthenticated
+      ? [
+          { href: "/dashboard", label: "My Library" },
+          { href: "/dictionary", label: "My Dictionary" },
+        ]
+      : []),
     { href: "/extension", label: "Chrome Extension" },
     { href: "/how-it-works", label: "How It Works" },
     { href: "/guides", label: "Guides" },

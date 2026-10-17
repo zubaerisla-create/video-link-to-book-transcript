@@ -1,9 +1,11 @@
+import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { AuthProvider } from "@/lib/auth-context";
+import { AnalyticsTracker } from "@/components/AnalyticsTracker";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://habd.tech";
 const adsenseClientId = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
@@ -97,6 +99,9 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-[#FFFDF8] text-[#292522]">
         <AuthProvider>
+          <Suspense fallback={null}>
+            <AnalyticsTracker />
+          </Suspense>
           <Navbar />
           <main className="flex-1">{children}</main>
           <Footer />
