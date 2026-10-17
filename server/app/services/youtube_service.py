@@ -15,6 +15,7 @@ from youtube_transcript_api._errors import (
     RequestBlocked,
     IpBlocked,
     PoTokenRequired,
+    AgeRestricted,
     InvalidVideoId,
     YouTubeRequestFailed,
     YouTubeTranscriptApiException,
@@ -24,6 +25,7 @@ from youtube_transcript_api._errors import (
 import os
 import http.cookiejar
 import requests
+from requests.exceptions import HTTPError
 from youtube_transcript_api.proxies import GenericProxyConfig
 from server.app.config import settings
 from server.app.services.transcript_coordinator import sanitize_details
@@ -36,12 +38,23 @@ from server.app.schemas.transcript import (
 
 
 class YouTubeError(Exception):
-    def __init__(self, message: str, code: str, status_code: int = 400, retry_after: Optional[int] = None):
+    def __init__(
+        self,
+        message: str,
+        code: str,
+        status_code: int = 400,
+        retry_after: Optional[int] = None,
+        retryable: Optional[bool] = None,
+    ):
         super().__init__(message)
         self.message = message
         self.code = code
         self.status_code = status_code
         self.retry_after = retry_after
+        if retryable is not None:
+            self.retryable = retryable
+        else:
+            self.retryable = status_code in (429, 502, 503, 504)
 
 
 logger = logging.getLogger("transcriptly.youtube")
@@ -224,24 +237,86 @@ def list_transcript_languages(video_id: str) -> List[TranscriptLanguage]:
     except (TranscriptsDisabled, NoTranscriptFound):
         return []
     except (VideoUnavailable, VideoUnplayable):
-        raise YouTubeError("Video is unavailable or private", "VIDEO_UNAVAILABLE", 404)
-    except (RequestBlocked, IpBlocked, PoTokenRequired) as e:
-        retry_after = extract_retry_after(e) or 30
+        raise YouTubeError("Video is unavailable or private", "VIDEO_UNAVAILABLE", 404, retryable=False)
+    except AgeRestricted:
+        logger.warning("YouTube video is age-restricted / requires authentication: %s", video_id)
+        raise YouTubeError(
+            "This video is age-restricted and requires YouTube login. Please use the Transcriptly Chrome Extension.",
+            "AGE_RESTRICTED",
+            403,
+            retryable=False,
+        )
+    except PoTokenRequired:
+        logger.warning("YouTube requested Proof-of-Origin token for %s", video_id)
+        raise YouTubeError(
+            "This video requires YouTube Proof-of-Origin verification. Please use the Transcriptly Chrome Extension.",
+            "PO_TOKEN_REQUIRED",
+            403,
+            retryable=False,
+        )
+    except IpBlocked as e:
+        retry_after = extract_retry_after(e)
         logger.warning(
-            "Upstream YouTube caption access throttled/blocked while listing tracks for %s: exc=%s, sanitized=%s, retry_after=%s",
+            "YouTube datacenter IP block detected while listing tracks for %s: exc=IpBlocked, sanitized=%s",
             video_id,
-            type(e).__name__,
             sanitize_details(e),
-            retry_after,
         )
         raise YouTubeError(
-            "YouTube caption access is temporarily rate-limited. Please retry shortly.",
-            "YOUTUBE_BLOCKED",
-            429,
+            "The server IP address is currently restricted by YouTube bot-detection policies. Please use the Transcriptly Chrome Extension or upload a subtitle file.",
+            "IP_BLOCKED",
+            403,
             retry_after=retry_after,
+            retryable=False,
+        )
+    except RequestBlocked as e:
+        retry_after = extract_retry_after(e)
+        logger.warning(
+            "YouTube bot-detection block detected while listing tracks for %s: exc=RequestBlocked, sanitized=%s",
+            video_id,
+            sanitize_details(e),
+        )
+        raise YouTubeError(
+            "YouTube has restricted automated requests ('Sign in to confirm you’re not a bot'). Please use the Transcriptly Chrome Extension.",
+            "REQUEST_BLOCKED",
+            403,
+            retry_after=retry_after,
+            retryable=False,
         )
     except InvalidVideoId:
-        raise YouTubeError("Invalid YouTube video ID", "INVALID_URL", 400)
+        raise YouTubeError("Invalid YouTube video ID", "INVALID_URL", 400, retryable=False)
+    except YouTubeRequestFailed as e:
+        retry_after = extract_retry_after(e)
+        sanitized = sanitize_details(e)
+        http_status = getattr(getattr(getattr(e, "http_error", None), "response", None), "status_code", None)
+        if http_status == 429:
+            logger.warning("Upstream YouTube rate limit (429) while listing tracks for %s: retry_after=%s", video_id, retry_after)
+            raise YouTubeError(
+                "YouTube caption access is temporarily rate-limited. Please retry shortly.",
+                "RATE_LIMITED",
+                429,
+                retry_after=retry_after,
+                retryable=True,
+            )
+        elif http_status == 403:
+            logger.warning("Upstream YouTube forbidden (403) while listing tracks for %s: %s", video_id, sanitized)
+            raise YouTubeError(
+                "Access to YouTube captions is restricted. Please use the Transcriptly Chrome Extension.",
+                "REQUEST_BLOCKED",
+                403,
+                retryable=False,
+            )
+        elif http_status in (502, 503, 504):
+            logger.warning("Upstream YouTube service unavailable (%s) while listing tracks for %s", http_status, video_id)
+            raise YouTubeError(
+                "YouTube service is temporarily unavailable. Please retry shortly.",
+                "UPSTREAM_UNAVAILABLE",
+                503,
+                retry_after=retry_after or 5,
+                retryable=True,
+            )
+        else:
+            logger.error("YouTubeRequestFailed listing tracks for %s (status=%s): %s", video_id, http_status, sanitized)
+            raise YouTubeError(f"Failed to list caption tracks: {sanitized}", "CAPTIONS_ERROR", 500, retry_after=retry_after, retryable=False)
     except Exception as e:
         retry_after = extract_retry_after(e)
         sanitized = sanitize_details(e)
@@ -251,7 +326,7 @@ def list_transcript_languages(video_id: str) -> List[TranscriptLanguage]:
             type(e).__name__,
             sanitized,
         )
-        raise YouTubeError(f"Failed to list caption tracks: {sanitized}", "CAPTIONS_ERROR", 500, retry_after=retry_after)
+        raise YouTubeError(f"Failed to list caption tracks: {sanitized}", "CAPTIONS_ERROR", 500, retry_after=retry_after, retryable=False)
 
 
 def detect_script_language(text: Optional[str]) -> Optional[str]:
@@ -399,28 +474,90 @@ def fetch_raw_transcript(
         api = get_youtube_transcript_api()
         transcript_list = api.list(video_id)
     except TranscriptsDisabled:
-        raise YouTubeError("Captions are disabled by the owner for this video", "NO_CAPTIONS", 404)
+        raise YouTubeError("Captions are disabled by the owner for this video", "NO_CAPTIONS", 404, retryable=False)
     except NoTranscriptFound:
-        raise YouTubeError("No captions found for this video", "NO_CAPTIONS", 404)
+        raise YouTubeError("No captions found for this video", "NO_CAPTIONS", 404, retryable=False)
     except (VideoUnavailable, VideoUnplayable):
-        raise YouTubeError("Video is unavailable or private", "VIDEO_UNAVAILABLE", 404)
-    except (RequestBlocked, IpBlocked, PoTokenRequired) as e:
-        retry_after = extract_retry_after(e) or 30
+        raise YouTubeError("Video is unavailable or private", "VIDEO_UNAVAILABLE", 404, retryable=False)
+    except AgeRestricted:
+        logger.warning("YouTube video is age-restricted / requires authentication for %s", video_id)
+        raise YouTubeError(
+            "This video is age-restricted and requires YouTube login. Please use the Transcriptly Chrome Extension while logged into YouTube.",
+            "AGE_RESTRICTED",
+            403,
+            retryable=False,
+        )
+    except PoTokenRequired:
+        logger.warning("YouTube requested Proof-of-Origin token for %s", video_id)
+        raise YouTubeError(
+            "This video requires YouTube Proof-of-Origin verification. Please use the Transcriptly Chrome Extension to access captions directly from your browser.",
+            "PO_TOKEN_REQUIRED",
+            403,
+            retryable=False,
+        )
+    except IpBlocked as e:
+        retry_after = extract_retry_after(e)
         logger.warning(
-            "Upstream YouTube caption retrieval throttled/blocked for %s: exc=%s, sanitized=%s, retry_after=%s",
+            "YouTube datacenter IP block detected for %s: exc=IpBlocked, sanitized=%s",
             video_id,
-            type(e).__name__,
             sanitize_details(e),
-            retry_after,
         )
         raise YouTubeError(
-            "YouTube caption access is temporarily rate-limited. Please retry shortly.",
-            "YOUTUBE_BLOCKED",
-            429,
+            "The server IP address is currently restricted by YouTube bot-detection policies. Please use the Transcriptly Chrome Extension or upload a subtitle file to extract transcripts without server IP restrictions.",
+            "IP_BLOCKED",
+            403,
             retry_after=retry_after,
+            retryable=False,
+        )
+    except RequestBlocked as e:
+        retry_after = extract_retry_after(e)
+        logger.warning(
+            "YouTube bot-detection block detected for %s: exc=RequestBlocked, sanitized=%s",
+            video_id,
+            sanitize_details(e),
+        )
+        raise YouTubeError(
+            "YouTube has restricted automated access ('Sign in to confirm you’re not a bot'). Please use the Transcriptly Chrome Extension to import transcripts directly from your browser.",
+            "REQUEST_BLOCKED",
+            403,
+            retry_after=retry_after,
+            retryable=False,
         )
     except InvalidVideoId:
-        raise YouTubeError("Invalid YouTube video ID", "INVALID_URL", 400)
+        raise YouTubeError("Invalid YouTube video ID", "INVALID_URL", 400, retryable=False)
+    except YouTubeRequestFailed as e:
+        retry_after = extract_retry_after(e)
+        sanitized = sanitize_details(e)
+        http_status = getattr(getattr(getattr(e, "http_error", None), "response", None), "status_code", None)
+        if http_status == 429:
+            logger.warning("Upstream YouTube rate limit (429) for %s: retry_after=%s", video_id, retry_after)
+            raise YouTubeError(
+                "YouTube caption access is temporarily rate-limited. Please retry shortly.",
+                "RATE_LIMITED",
+                429,
+                retry_after=retry_after,
+                retryable=True,
+            )
+        elif http_status == 403:
+            logger.warning("Upstream YouTube forbidden (403) for %s: %s", video_id, sanitized)
+            raise YouTubeError(
+                "Access to YouTube captions is restricted. Please use the Transcriptly Chrome Extension.",
+                "REQUEST_BLOCKED",
+                403,
+                retryable=False,
+            )
+        elif http_status in (502, 503, 504):
+            logger.warning("Upstream YouTube service unavailable (%s) for %s", http_status, video_id)
+            raise YouTubeError(
+                "YouTube service is temporarily unavailable. Please retry shortly.",
+                "UPSTREAM_UNAVAILABLE",
+                503,
+                retry_after=retry_after or 5,
+                retryable=True,
+            )
+        else:
+            logger.error("YouTubeRequestFailed for %s (status=%s): %s", video_id, http_status, sanitized)
+            raise YouTubeError(f"Unable to retrieve captions: {sanitized}", "RETRIEVAL_FAILED", 500, retry_after=retry_after, retryable=False)
     except Exception as e:
         retry_after = extract_retry_after(e)
         sanitized = sanitize_details(e)
@@ -430,7 +567,7 @@ def fetch_raw_transcript(
             type(e).__name__,
             sanitized,
         )
-        raise YouTubeError(f"Unable to retrieve captions: {sanitized}", "RETRIEVAL_FAILED", 500, retry_after=retry_after)
+        raise YouTubeError(f"Unable to retrieve captions: {sanitized}", "RETRIEVAL_FAILED", 500, retry_after=retry_after, retryable=False)
 
     track_list = list(transcript_list)
     available_languages: List[TranscriptLanguage] = []
@@ -502,24 +639,40 @@ def fetch_raw_transcript(
         )
         return raw_data, lang_name, lang_code, is_gen, available_languages, target_track
     except (RequestBlocked, IpBlocked, PoTokenRequired) as e:
-        retry_after = extract_retry_after(e) or 30
+        retry_after = extract_retry_after(e)
         logger.warning(
-            "Upstream YouTube caption content download throttled for %s: exc=%s, sanitized=%s, retry_after=%s",
+            "Upstream YouTube caption content download blocked for %s: exc=%s, sanitized=%s",
             video_id,
             type(e).__name__,
             sanitize_details(e),
-            retry_after,
         )
-        raise YouTubeError(
-            "YouTube caption access is temporarily rate-limited. Please retry shortly.",
-            "YOUTUBE_BLOCKED",
-            429,
-            retry_after=retry_after,
-        )
+        if isinstance(e, IpBlocked):
+            raise YouTubeError(
+                "The server IP address is currently restricted by YouTube bot-detection policies. Please use the Transcriptly Chrome Extension or upload a subtitle file.",
+                "IP_BLOCKED",
+                403,
+                retry_after=retry_after,
+                retryable=False,
+            )
+        elif isinstance(e, PoTokenRequired):
+            raise YouTubeError(
+                "This video requires YouTube Proof-of-Origin verification. Please use the Transcriptly Chrome Extension.",
+                "PO_TOKEN_REQUIRED",
+                403,
+                retryable=False,
+            )
+        else:
+            raise YouTubeError(
+                "YouTube has restricted automated access ('Sign in to confirm you’re not a bot'). Please use the Transcriptly Chrome Extension.",
+                "REQUEST_BLOCKED",
+                403,
+                retry_after=retry_after,
+                retryable=False,
+            )
     except Exception as e:
         retry_after = extract_retry_after(e)
         sanitized = sanitize_details(e)
-        raise YouTubeError(f"Failed to fetch subtitle content: {sanitized}", "FETCH_FAILED", 500, retry_after=retry_after)
+        raise YouTubeError(f"Failed to fetch subtitle content: {sanitized}", "FETCH_FAILED", 500, retry_after=retry_after, retryable=False)
 
 
 def try_youtube_translate_track(track_object: Any, target_language: str) -> Optional[List[dict]]:
@@ -558,6 +711,7 @@ async def fetch_raw_transcript_with_retry(
     """
     Executes fetch_raw_transcript with bounded exponential backoff and jitter for transient throttling.
     Never loops indefinitely. Respects Retry-After when available.
+    Does not retry permanent errors, IP blocks, permission errors, or missing captions.
     """
     if fetcher is None:
         fetcher = fetch_raw_transcript
@@ -576,8 +730,7 @@ async def fetch_raw_transcript_with_retry(
                 return await res
             return res
         except YouTubeError as ye:
-            # If not rate-limited (e.g. 404 NO_CAPTIONS, 400 INVALID_URL), do not retry
-            if ye.status_code != 429 or attempt >= max_retries:
+            if not getattr(ye, "retryable", False) or attempt >= max_retries:
                 raise
 
             retry_after = ye.retry_after

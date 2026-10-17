@@ -296,3 +296,112 @@ def test_failed_requests_are_not_cached(mock_fetch_transcript, mock_get_video_in
     res2 = client.post("/api/transcript", json={"url": url})
     assert res2.status_code == 404
     assert mock_fetch_transcript.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_ip_blocked_and_permission_errors_are_not_retried():
+    """Verify that IP blocks and permission errors fail immediately without retry attempts."""
+    ip_call_count = 0
+    bot_call_count = 0
+
+    def mock_ip_blocked_fetcher(video_id, preferred_language=None, video_title=None):
+        nonlocal ip_call_count
+        ip_call_count += 1
+        raise YouTubeError("Server IP restricted", "IP_BLOCKED", 403, retryable=False)
+
+    def mock_bot_blocked_fetcher(video_id, preferred_language=None, video_title=None):
+        nonlocal bot_call_count
+        bot_call_count += 1
+        raise YouTubeError("Bot detected", "REQUEST_BLOCKED", 403, retryable=False)
+
+    with patch.object(settings, "TRANSCRIPT_MAX_RETRIES", 2):
+        with pytest.raises(YouTubeError) as exc_info1:
+            await fetch_raw_transcript_with_retry("ipBlockVid1", fetcher=mock_ip_blocked_fetcher)
+        assert exc_info1.value.status_code == 403
+        assert exc_info1.value.code == "IP_BLOCKED"
+        assert ip_call_count == 1  # No retries!
+
+        with pytest.raises(YouTubeError) as exc_info2:
+            await fetch_raw_transcript_with_retry("botBlockVid2", fetcher=mock_bot_blocked_fetcher)
+        assert exc_info2.value.status_code == 403
+        assert exc_info2.value.code == "REQUEST_BLOCKED"
+        assert bot_call_count == 1  # No retries!
+
+
+@patch("server.app.api.routes.get_video_info")
+@patch("server.app.api.routes.fetch_raw_transcript")
+def test_api_returns_403_for_ip_blocked_with_guidance(mock_fetch_transcript, mock_get_video_info):
+    """Verify that an IP_BLOCKED error returns HTTP 403 with clear explanation and fallback hints."""
+    mock_get_video_info.return_value = {"title": "Test IP Block", "author": "Channel"}
+    mock_fetch_transcript.side_effect = YouTubeError(
+        "The server IP address is currently restricted by YouTube bot-detection policies.",
+        "IP_BLOCKED",
+        403,
+        retryable=False,
+    )
+
+    response = client.post(
+        "/api/transcript",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXc4", "enable_speech_fallback": False}
+    )
+
+    assert response.status_code == 403
+    data = response.json()
+    assert data["detail"]["code"] == "IP_BLOCKED"
+    assert "extension" in data["detail"]["detail"].lower() or "subtitle" in data["detail"]["detail"].lower()
+
+
+@patch("server.app.api.routes.get_video_info")
+@patch("server.app.api.routes.fetch_raw_transcript")
+@patch("server.app.api.routes.transcribe_youtube_audio")
+def test_speech_fallback_triggers_on_ip_blocked_when_enabled(
+    mock_speech, mock_fetch_transcript, mock_get_video_info
+):
+    """Verify that when enable_speech_fallback=True, IP_BLOCKED error falls back to speech transcription."""
+    mock_get_video_info.return_value = {"video_id": "dQw4w9WgXc5", "title": "Audio Speech Fallback"}
+    mock_fetch_transcript.side_effect = YouTubeError(
+        "Server IP blocked",
+        "IP_BLOCKED",
+        403,
+        retryable=False,
+    )
+    mock_speech.return_value = (
+        [{"text": "Spoken audio recognized locally", "start": 0.0, "duration": 4.0}],
+        "English",
+        "en",
+    )
+
+    response = client.post(
+        "/api/transcript",
+        json={
+            "url": "https://www.youtube.com/watch?v=dQw4w9WgXc5",
+            "enable_speech_fallback": True,
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["transcription_method"] == "speech_recognition"
+    assert len(data["warnings"]) > 0
+    assert "speech recognition" in data["warnings"][0].lower()
+
+
+@patch("server.app.api.routes.list_transcript_languages")
+def test_transcript_languages_cached_and_reused(mock_list_languages):
+    """Verify that language tracks are cached and subsequent calls do not invoke YouTube list tracks."""
+    mock_list_languages.return_value = [
+        {"code": "en", "name": "English", "is_generated": False, "is_translatable": True},
+        {"code": "es", "name": "Spanish", "is_generated": False, "is_translatable": True},
+    ]
+
+    vid = "dQw4w9WgXc6"
+    res1 = client.get(f"/api/transcript/languages?video_id={vid}")
+    assert res1.status_code == 200
+    assert len(res1.json()["languages"]) == 2
+    assert mock_list_languages.call_count == 1
+
+    # Second call should be served from coordinator cache
+    res2 = client.get(f"/api/transcript/languages?video_id={vid}")
+    assert res2.status_code == 200
+    assert mock_list_languages.call_count == 1
+

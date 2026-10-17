@@ -27,10 +27,12 @@ import {
   BookOpen,
   Loader2,
   ArrowRight,
+  Upload,
 } from "lucide-react";
 import {
   fetchTranscript,
   saveBookApi,
+  stageTranscriptImportApi,
   ApiError,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -115,6 +117,14 @@ function HomePageContent() {
   const [savedBookId, setSavedBookId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Subtitle File Upload / Paste Fallback Modal state
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadText, setUploadText] = useState("");
+  const [uploadFileName, setUploadFileName] = useState("");
+  const [uploadVideoUrl, setUploadVideoUrl] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   // Restore pending save if coming back from login/signup
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -176,22 +186,80 @@ function HomePageContent() {
     }
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (text) {
+        setUploadText(text);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleStageUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadText.trim()) {
+      setUploadError("Please choose a subtitle file or paste transcript text.");
+      return;
+    }
+    const targetVideoUrl = uploadVideoUrl.trim() || url.trim();
+    if (!targetVideoUrl) {
+      setUploadError("Please provide a valid YouTube video URL for this transcript.");
+      return;
+    }
+    if (!isValidYouTubeUrl(targetVideoUrl)) {
+      setUploadError("Please provide a valid YouTube video URL (e.g., https://www.youtube.com/watch?v=...).");
+      return;
+    }
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const staged = await stageTranscriptImportApi({
+        video_url: targetVideoUrl,
+        raw_text: uploadText,
+      });
+      setShowUploadModal(false);
+      router.push(`/import?token=${encodeURIComponent(staged.import_token)}`);
+    } catch (err: unknown) {
+      if (err instanceof ApiError) {
+        setUploadError(err.message);
+      } else {
+        setUploadError("Failed to stage subtitle import. Please verify the subtitle format and try again.");
+      }
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   // Centralized API error handler with rate-limit countdown
   const handleApiError = (err: unknown) => {
     if (err instanceof ApiError) {
       let userMessage = err.message;
       if (err.code === "NO_CAPTIONS") {
         userMessage =
-          "No accessible captions or subtitles were found for this video. You can enable the Speech-to-Text fallback checkbox above to recognize the audio locally.";
+          "No accessible captions or subtitles were found for this video. You can enable Speech-to-Text fallback, use our Chrome Extension, or upload a subtitle file.";
+      } else if (err.code === "IP_BLOCKED") {
+        userMessage =
+          "The server IP address is currently restricted by YouTube bot-detection policies. Use our free Chrome Extension to extract transcripts directly from your browser, or upload a subtitle file.";
+      } else if (err.code === "REQUEST_BLOCKED") {
+        userMessage =
+          "YouTube has restricted automated requests ('Sign in to confirm you’re not a bot'). You can import the transcript directly using our Chrome Extension or upload a subtitle file.";
+      } else if (err.code === "PO_TOKEN_REQUIRED") {
+        userMessage =
+          "This video requires YouTube Proof-of-Origin token verification. Please use our Chrome Extension to import the transcript directly.";
+      } else if (err.code === "AGE_RESTRICTED" || err.code === "VIDEO_RESTRICTED") {
+        userMessage =
+          "This video is age-restricted or requires YouTube account login. Please use the Chrome Extension while logged into YouTube.";
       } else if (err.code === "VIDEO_UNAVAILABLE") {
         userMessage =
           "This YouTube video is unavailable, private, or has been removed.";
-      } else if (err.code === "VIDEO_RESTRICTED") {
+      } else if (err.code === "RATE_LIMITED" || err.code === "YOUTUBE_BLOCKED") {
         userMessage =
-          "This video is age-restricted or requires YouTube account login.";
-      } else if (err.code === "YOUTUBE_BLOCKED") {
-        userMessage =
-          "YouTube has temporarily throttled automated caption requests from the server. Please wait before retrying.";
+          "YouTube caption access is temporarily rate-limited. Please wait for the cooldown timer before retrying.";
       } else if (err.code === "RATE_LIMIT_EXCEEDED") {
         userMessage =
           "Too many requests from your device. Please wait a moment before trying again.";
@@ -207,6 +275,7 @@ function HomePageContent() {
       if (
         err.statusCode === 429 ||
         err.code === "YOUTUBE_BLOCKED" ||
+        err.code === "RATE_LIMITED" ||
         err.code === "RATE_LIMIT_EXCEEDED" ||
         err.code === "SERVER_BUSY"
       ) {
@@ -752,33 +821,54 @@ function HomePageContent() {
         <div
           className={`rounded-2xl border p-6 mb-8 shadow-xs ${
             error.code === "YOUTUBE_BLOCKED" ||
+            error.code === "RATE_LIMITED" ||
             error.code === "RATE_LIMIT_EXCEEDED" ||
             error.code === "SERVER_BUSY"
               ? "border-amber-200 bg-amber-50/50"
+              : error.code === "IP_BLOCKED" ||
+                error.code === "REQUEST_BLOCKED" ||
+                error.code === "PO_TOKEN_REQUIRED"
+              ? "border-amber-300 bg-[#FFFDF8]"
               : "border-red-200 bg-red-50/50"
           }`}
         >
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-3.5">
             <div
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
                 error.code === "YOUTUBE_BLOCKED" ||
+                error.code === "RATE_LIMITED" ||
                 error.code === "RATE_LIMIT_EXCEEDED" ||
                 error.code === "SERVER_BUSY"
                   ? "bg-amber-100 text-amber-700"
+                  : error.code === "IP_BLOCKED" ||
+                    error.code === "REQUEST_BLOCKED" ||
+                    error.code === "PO_TOKEN_REQUIRED"
+                  ? "bg-[#FFF1B8] text-[#292522]"
                   : "bg-red-100 text-red-600"
               }`}
             >
               <AlertCircle className="h-5 w-5" />
             </div>
             <div className="flex-1">
-              <h2 className="text-base font-semibold text-[#292522] mb-1">
+              <h2 className="text-base font-bold text-[#292522] mb-1">
                 {error.code === "YOUTUBE_BLOCKED" ||
+                error.code === "RATE_LIMITED" ||
                 error.code === "RATE_LIMIT_EXCEEDED" ||
                 error.code === "SERVER_BUSY"
                   ? "Request Temporarily Throttled"
+                  : error.code === "IP_BLOCKED" ||
+                    error.code === "REQUEST_BLOCKED" ||
+                    error.code === "PO_TOKEN_REQUIRED"
+                  ? "Server Restricted by YouTube Bot Detection"
+                  : error.code === "AGE_RESTRICTED" || error.code === "VIDEO_RESTRICTED"
+                  ? "YouTube Authentication Required"
+                  : error.code === "NO_CAPTIONS"
+                  ? "No Captions Available"
+                  : error.code === "VIDEO_UNAVAILABLE"
+                  ? "Video Unavailable"
                   : "Could not retrieve transcript"}
               </h2>
-              <p className="text-sm text-[#77716D] leading-relaxed mb-3">
+              <p className="text-sm text-[#77716D] leading-relaxed mb-4">
                 {error.message}
               </p>
 
@@ -792,25 +882,68 @@ function HomePageContent() {
                 </div>
               )}
 
-              <div className="flex items-center gap-3">
+              {/* Action and Fallback Options */}
+              <div className="flex flex-wrap items-center gap-2.5">
                 <button
                   type="button"
                   onClick={() => handleExtract()}
                   disabled={
                     isLoading || (retryCountdown !== null && retryCountdown > 0)
                   }
-                  className="rounded-lg bg-white border border-[#F0E8E2] px-3.5 py-1.5 text-xs font-medium text-[#292522] hover:bg-[#F8DDE8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="rounded-xl bg-[#292522] px-4 py-2 text-xs font-semibold text-white hover:bg-[#1a1715] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {retryCountdown !== null && retryCountdown > 0
                     ? `Retry available in ${retryCountdown}s`
-                    : "Retry Request"}
+                    : "Retry Extraction"}
                 </button>
+
+                {!enableSpeechFallback &&
+                  (error.code === "NO_CAPTIONS" ||
+                    error.code === "IP_BLOCKED" ||
+                    error.code === "REQUEST_BLOCKED" ||
+                    error.code === "PO_TOKEN_REQUIRED" ||
+                    error.code === "YOUTUBE_BLOCKED" ||
+                    error.code === "RATE_LIMITED") && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEnableSpeechFallback(true);
+                        setTimeout(() => handleExtract(), 100);
+                      }}
+                      className="rounded-xl border border-[#E8DACB] bg-[#FFF1B8] px-3.5 py-2 text-xs font-semibold text-[#292522] hover:bg-[#ffeaa7] transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Mic className="h-3.5 w-3.5" />
+                      <span>Transcribe with Speech-to-Text</span>
+                    </button>
+                  )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadVideoUrl(url.trim());
+                    setUploadError(null);
+                    setShowUploadModal(true);
+                  }}
+                  className="rounded-xl border border-[#E8DACB] bg-white px-3.5 py-2 text-xs font-semibold text-[#292522] hover:bg-[#FAF4EC] transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  <span>Upload / Paste Subtitles</span>
+                </button>
+
+                <Link
+                  href="/extension"
+                  className="rounded-xl border border-[#E8DACB] bg-white px-3.5 py-2 text-xs font-semibold text-[#292522] hover:bg-[#FAF4EC] transition-colors inline-flex items-center gap-1.5"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>Use Chrome Extension</span>
+                </Link>
+
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="text-xs text-[#77716D] hover:text-[#292522] transition-colors"
+                  className="text-xs text-[#77716D] hover:text-[#292522] px-2 py-1 transition-colors cursor-pointer"
                 >
-                  Try another video
+                  Clear URL
                 </button>
               </div>
             </div>
@@ -1702,6 +1835,131 @@ function HomePageContent() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Subtitle File Upload / Paste Fallback Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="w-full max-w-lg rounded-3xl border border-[#F0E8E2] bg-white p-6 sm:p-7 shadow-xl relative my-8">
+            <div className="flex items-center justify-between border-b border-[#F0E8E2] pb-3 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FFF1B8] text-[#292522]">
+                  <Upload className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#292522]">Upload or Paste Subtitles</h3>
+                  <p className="text-xs text-[#77716D]">Import subtitles or transcript text to read as a digital book</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowUploadModal(false)}
+                className="text-[#77716D] hover:text-[#292522] p-1 rounded-lg hover:bg-[#FAF4EC] transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {uploadError && (
+              <div className="mb-4 flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-700">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{uploadError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleStageUpload} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#292522] mb-1.5">
+                  YouTube Video Link:
+                </label>
+                <input
+                  type="url"
+                  value={uploadVideoUrl}
+                  onChange={(e) => setUploadVideoUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  required
+                  className="w-full rounded-xl border border-[#F0E8E2] bg-[#FFFDF8] px-3.5 py-2.5 text-xs sm:text-sm text-[#292522] focus:outline-none focus:ring-2 focus:ring-[#E9A9C3]"
+                />
+                <p className="mt-1 text-[11px] text-[#77716D]">
+                  Associates timestamps with the video player.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#292522] mb-1.5">
+                  Choose Subtitle File (.srt, .vtt, or .txt):
+                </label>
+                <div className="flex items-center gap-3">
+                  <label className="inline-flex items-center gap-2 rounded-xl border border-[#E8DACB] bg-[#FAF4EC] px-3.5 py-2 text-xs font-semibold text-[#292522] hover:bg-[#F0E8E2] cursor-pointer transition-colors">
+                    <Upload className="h-3.5 w-3.5" />
+                    <span>Browse File</span>
+                    <input
+                      type="file"
+                      accept=".srt,.vtt,.txt,text/plain"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  <span className="text-xs text-[#77716D] truncate max-w-[240px]">
+                    {uploadFileName || "No file selected"}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-[#292522]">
+                    Or Paste Subtitle / Transcript Text:
+                  </label>
+                  {uploadText.length > 0 && (
+                    <span className="text-[11px] text-[#77716D]">
+                      {uploadText.length.toLocaleString()} characters
+                    </span>
+                  )}
+                </div>
+                <textarea
+                  rows={6}
+                  value={uploadText}
+                  onChange={(e) => setUploadText(e.target.value)}
+                  placeholder="Paste subtitle text here (supports timestamped transcripts like '01:23 Line text' or plain text paragraphs)..."
+                  className="w-full rounded-xl border border-[#F0E8E2] bg-[#FFFDF8] p-3 text-xs text-[#292522] font-mono focus:outline-none focus:ring-2 focus:ring-[#E9A9C3]"
+                />
+              </div>
+
+              <div className="rounded-xl bg-[#FFF1B8]/40 border border-[#F0E8E2] p-3 text-[11px] text-[#433422] leading-relaxed">
+                💡 <strong>Privacy notice:</strong> Please only upload or paste subtitle files you have permission to use. Your transcript is parsed locally and staged privately for your reading session.
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#F0E8E2]">
+                <button
+                  type="button"
+                  onClick={() => setShowUploadModal(false)}
+                  disabled={isUploading}
+                  className="rounded-xl px-4 py-2 text-xs font-medium text-[#77716D] hover:text-[#292522] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUploading || !uploadText.trim()}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#292522] px-5 py-2.5 text-xs font-semibold text-white hover:bg-[#1a1715] shadow-xs disabled:opacity-50 cursor-pointer transition-colors"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Processing Subtitles...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-3.5 w-3.5" />
+                      <span>Stage & Open Reader</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

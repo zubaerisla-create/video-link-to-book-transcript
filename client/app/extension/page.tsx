@@ -10,11 +10,14 @@ import {
   HelpCircle,
   ChevronDown,
   ArrowRight,
+  Play,
+  ExternalLink,
 } from "lucide-react";
 
 export default function ExtensionGuidePage() {
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [isVideoLoaded, setIsVideoLoaded] = useState<boolean>(false);
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -140,7 +143,7 @@ export default function ExtensionGuidePage() {
             </a>
 
             <a
-              href="#steps-section"
+              href="#tutorial-section"
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#E8DACB] bg-white px-6 py-4 text-sm font-semibold text-[#292522] hover:bg-[#FAF4EC] transition-colors w-full sm:w-auto"
             >
               <span>কীভাবে কাজ করে দেখুন</span>
@@ -149,6 +152,82 @@ export default function ExtensionGuidePage() {
           </div>
 
 
+        </div>
+      </section>
+
+      {/* Video Tutorial Section */}
+      <section id="tutorial-section" className="mx-auto max-w-4xl px-4 pt-10 sm:pt-14 sm:px-6">
+        <div className="rounded-3xl border border-[#F0E8E2] bg-white p-6 sm:p-8 shadow-xs">
+          <div className="text-center mb-6 sm:mb-8">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#77716D] bg-[#FFF1B8] px-3 py-1 rounded-full border border-[#F0E8E2]">
+              ভিডিও টিউটোরিয়াল • Tutorial Video
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-[#292522] mt-3">
+              How to Use Transcriptly
+            </h2>
+            <p className="text-sm sm:text-base text-[#77716D] mt-2 max-w-xl mx-auto">
+              Watch this quick tutorial to learn how to use the extension and extract video transcripts.
+            </p>
+          </div>
+
+          {/* 16:9 Responsive Video Player / Preview Card */}
+          <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-[#F0E8E2] bg-[#292522] shadow-sm">
+            {isVideoLoaded ? (
+              <iframe
+                src="https://player.cloudinary.com/embed/?cloud_name=dpjxjbhrb&public_id=lv_0_20261017194748_ptnqve&autoplay=true"
+                width="100%"
+                height="100%"
+                className="w-full h-full border-0"
+                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                allowFullScreen
+                title="How to Use Transcriptly - Extension Tutorial Video"
+              />
+            ) : (
+              <div
+                className="group relative w-full h-full cursor-pointer overflow-hidden"
+                onClick={() => setIsVideoLoaded(true)}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="https://res.cloudinary.com/dpjxjbhrb/video/upload/lv_0_20261017194748_ptnqve.jpg"
+                  alt="How to Use Transcriptly tutorial video thumbnail"
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-black/25 group-hover:bg-black/35 transition-colors flex items-center justify-center">
+                  <button
+                    type="button"
+                    aria-label="Play tutorial video: How to Use Transcriptly"
+                    className="flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-[#292522]/90 text-white shadow-xl transition-all duration-200 group-hover:scale-110 group-hover:bg-[#1a1715] border-2 border-[#FFF1B8]/80"
+                  >
+                    <Play className="h-7 w-7 sm:h-9 sm:w-9 fill-[#FFF1B8] text-[#FFF1B8] ml-1" />
+                  </button>
+                </div>
+                <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4">
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#292522]/85 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-xs">
+                    <Play className="h-3 w-3 fill-white" />
+                    Click to Play Tutorial
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Action & Note Row below Video */}
+          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#77716D]">
+            <span className="flex items-center gap-1.5 text-center sm:text-left">
+              💡 এক্সটেনশনটি ব্যবহার করে ইউটিউব থেকে সরাসরি ব্রাউজারে ট্রান্সক্রিপ্ট সংগ্রহ করার নিয়ম দেখুন।
+            </span>
+            <a
+              href="https://player.cloudinary.com/embed/?cloud_name=dpjxjbhrb&public_id=lv_0_20261017194748_ptnqve"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 font-medium text-[#292522] hover:text-[#E9A9C3] hover:underline transition-colors shrink-0"
+            >
+              <span>Watch in full window</span>
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
         </div>
       </section>
 

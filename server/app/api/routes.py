@@ -115,10 +115,16 @@ async def get_transcript_languages(
     try:
         vid = extract_video_id(video_id)
         # Check raw cache first if available
-        cached_raw = await coordinator.cache.get_raw(f"{vid}:auto")
+        cached_langs = await coordinator.cache.get_raw(f"{vid}:languages")
+        if cached_langs and "available_languages" in cached_langs:
+            logger.info("Serving transcript languages from cache for %s", vid)
+            return LanguagesResponse(video_id=vid, languages=cached_langs["available_languages"])
+        cached_raw = await coordinator.cache.get_raw(f"{vid}:auto:0") or await coordinator.cache.get_raw(f"{vid}:auto")
         if cached_raw and "available_languages" in cached_raw:
+            logger.info("Serving transcript languages from raw segment cache for %s", vid)
             return LanguagesResponse(video_id=vid, languages=cached_raw["available_languages"])
         languages = list_transcript_languages(vid)
+        await coordinator.cache.set_raw(f"{vid}:languages", {"available_languages": languages})
         return LanguagesResponse(video_id=vid, languages=languages)
     except YouTubeError as e:
         headers = {"Retry-After": str(e.retry_after)} if e.retry_after else {}
@@ -261,7 +267,15 @@ async def extract_transcript(payload: TranscriptRequest):
                         caption_err.code,
                     )
                     # Speech recognition fallback only if requested and captions are missing or blocked
-                    if payload.enable_speech_fallback and caption_err.code in ("NO_CAPTIONS", "RETRIEVAL_FAILED", "YOUTUBE_BLOCKED"):
+                    if payload.enable_speech_fallback and caption_err.code in (
+                        "NO_CAPTIONS",
+                        "RETRIEVAL_FAILED",
+                        "YOUTUBE_BLOCKED",
+                        "IP_BLOCKED",
+                        "REQUEST_BLOCKED",
+                        "PO_TOKEN_REQUIRED",
+                        "RATE_LIMITED",
+                    ):
                         logger.info("Initiating local speech recognition fallback via faster-whisper for %s...", vid)
                         try:
                             raw_segments, lang_name, lang_code = await transcribe_youtube_audio(
@@ -291,8 +305,15 @@ async def extract_transcript(payload: TranscriptRequest):
                             )
                     else:
                         hint = ""
-                        if not payload.enable_speech_fallback and caption_err.code in ("NO_CAPTIONS", "YOUTUBE_BLOCKED"):
-                            hint = " You can enable the Speech-to-Text fallback option to transcribe the audio locally."
+                        if not payload.enable_speech_fallback and caption_err.code in (
+                            "NO_CAPTIONS",
+                            "YOUTUBE_BLOCKED",
+                            "IP_BLOCKED",
+                            "REQUEST_BLOCKED",
+                            "PO_TOKEN_REQUIRED",
+                            "RATE_LIMITED",
+                        ):
+                            hint = " You can enable the Speech-to-Text fallback option, use the Transcriptly Chrome Extension, or upload a subtitle file."
                         headers = {"Retry-After": str(caption_err.retry_after)} if caption_err.retry_after else {}
                         detail_data = {"detail": f"{caption_err.message}.{hint}".strip(), "code": caption_err.code}
                         if caption_err.retry_after:
@@ -315,6 +336,10 @@ async def extract_transcript(payload: TranscriptRequest):
                     "transcription_method": transcription_method,
                     "warnings": warnings,
                 })
+                if available_langs:
+                    await coordinator.cache.set_raw(f"{vid}:languages", {
+                        "available_languages": available_langs,
+                    })
             finally:
                 await coordinator.release_concurrency_slot()
 
