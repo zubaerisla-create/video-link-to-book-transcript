@@ -88,7 +88,6 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <head>
-        <meta name="google-adsense-account" content={ADSENSE_CLIENT_ID} />
         <Script
           id="google-adsense-script"
           async
