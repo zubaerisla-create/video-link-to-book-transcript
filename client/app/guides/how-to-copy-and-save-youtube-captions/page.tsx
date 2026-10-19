@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, Clock, Calendar, CheckCircle2, Download, BookOpen } from "lucide-react";
+import { AdBanner } from "@/components/AdBanner";
+import { ADSENSE_SLOTS } from "@/lib/adsense";
 
 export const metadata: Metadata = {
   title: "How to Copy, Format, and Save YouTube Captions",
@@ -160,6 +162,9 @@ export default function Guide2Page() {
             <li>Download a real PDF book with page numbers and Unicode Bangla/multilingual font rendering.</li>
           </ul>
         </section>
+
+        {/* AdSense Unit (Manual Slot or Auto Ad placeholder) */}
+        <AdBanner slot={ADSENSE_SLOTS.ARTICLE_BOTTOM} />
 
         {/* Related Guides */}
         <div className="pt-8 border-t border-[#F0E8E2] space-y-4">

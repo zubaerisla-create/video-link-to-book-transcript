@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BookOpen, FileText, Copy, AlertCircle, GraduationCap, Clock, ArrowRight, Sparkles } from "lucide-react";
+import { AdBanner } from "@/components/AdBanner";
+import { ADSENSE_SLOTS } from "@/lib/adsense";
 
 export const metadata: Metadata = {
   title: "YouTube Transcript Guides & Tutorials",
@@ -123,6 +125,9 @@ export default function GuidesHubPage() {
           );
         })}
       </div>
+
+      {/* AdSense Unit (Manual Slot or Auto Ad placeholder) */}
+      <AdBanner slot={ADSENSE_SLOTS.GUIDES_BOTTOM} />
 
       {/* Bottom CTA Banner */}
       <div className="mt-16 rounded-3xl border border-[#F0E8E2] bg-[#FFFDF8] p-8 sm:p-10 text-center space-y-4">

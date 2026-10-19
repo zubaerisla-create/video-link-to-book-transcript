@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, Clock, Calendar, GraduationCap, CheckCircle2, Search, BookOpen } from "lucide-react";
+import { AdBanner } from "@/components/AdBanner";
+import { ADSENSE_SLOTS } from "@/lib/adsense";
 
 export const metadata: Metadata = {
   title: "How to Use Video Transcripts for Studying and Research",
@@ -137,6 +139,9 @@ export default function Guide4Page() {
             <li>Export a formatted <strong>PDF</strong> to load onto your iPad, Kindle, or e-reader for offline study.</li>
           </ol>
         </section>
+
+        {/* AdSense Unit (Manual Slot or Auto Ad placeholder) */}
+        <AdBanner slot={ADSENSE_SLOTS.ARTICLE_BOTTOM} />
 
         {/* Related Guides */}
         <div className="pt-8 border-t border-[#F0E8E2] space-y-4">

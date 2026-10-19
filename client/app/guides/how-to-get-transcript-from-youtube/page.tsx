@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, Clock, Calendar, CheckCircle2, AlertCircle } from "lucide-react";
+import { Clock, Calendar } from "lucide-react";
+import { AdBanner } from "@/components/AdBanner";
+import { ADSENSE_SLOTS } from "@/lib/adsense";
 
 export const metadata: Metadata = {
   title: "How to Get a Transcript from a YouTube Video (Step-by-Step)",
@@ -135,6 +137,9 @@ export default function Guide1Page() {
             Some YouTube videos lack both creator-uploaded subtitles and automated captions (often due to background music, non-supported dialects, or creator preferences). In Transcriptly, you can toggle on <strong>Local Speech Recognition Fallback</strong>, which processes the speech stream directly on your machine without third-party fees.
           </p>
         </section>
+
+        {/* AdSense Unit (Manual Slot or Auto Ad placeholder) */}
+        <AdBanner slot={ADSENSE_SLOTS.ARTICLE_BOTTOM} />
 
         {/* Related Guides */}
         <div className="pt-8 border-t border-[#F0E8E2] space-y-4">

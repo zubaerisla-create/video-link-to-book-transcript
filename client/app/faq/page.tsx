@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { HelpCircle, ChevronDown, CheckCircle2, AlertCircle } from "lucide-react";
+import { HelpCircle, ChevronDown } from "lucide-react";
+import { AdBanner } from "@/components/AdBanner";
+import { ADSENSE_SLOTS } from "@/lib/adsense";
 
 export const metadata: Metadata = {
   title: "Frequently Asked Questions (FAQ)",
@@ -152,6 +154,9 @@ export default function FAQPage() {
           </div>
         ))}
       </div>
+
+      {/* AdSense Unit (Manual Slot or Auto Ad placeholder) */}
+      <AdBanner slot={ADSENSE_SLOTS.FAQ_BOTTOM} />
 
       {/* Still Have Questions Box */}
       <div className="mt-16 rounded-3xl border border-[#F0E8E2] bg-[#FFF1B8]/40 p-8 text-center space-y-4">

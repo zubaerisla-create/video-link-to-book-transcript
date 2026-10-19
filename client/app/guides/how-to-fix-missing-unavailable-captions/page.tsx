@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, Clock, Calendar, AlertTriangle, CheckCircle2, Mic } from "lucide-react";
+import { AdBanner } from "@/components/AdBanner";
+import { ADSENSE_SLOTS } from "@/lib/adsense";
 
 export const metadata: Metadata = {
   title: "How to Fix Missing or Unavailable YouTube Captions",
@@ -158,6 +160,9 @@ export default function Guide3Page() {
             <strong>Note:</strong> Speech recognition takes longer than instant caption retrieval (typically 10 to 30 seconds depending on video length and server load), but it allows you to obtain transcripts for videos that have no captions on YouTube.
           </div>
         </section>
+
+        {/* AdSense Unit (Manual Slot or Auto Ad placeholder) */}
+        <AdBanner slot={ADSENSE_SLOTS.ARTICLE_BOTTOM} />
 
         {/* Related Guides */}
         <div className="pt-8 border-t border-[#F0E8E2] space-y-4">

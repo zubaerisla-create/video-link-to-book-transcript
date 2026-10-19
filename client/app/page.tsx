@@ -43,6 +43,8 @@ import {
   TranscriptLanguage,
 } from "@/lib/types";
 import { isValidYouTubeUrl } from "@/lib/validation";
+import { AdBanner } from "@/components/AdBanner";
+import { ADSENSE_SLOTS } from "@/lib/adsense";
 
 const PRESET_LANGUAGES = [
   { code: "auto", name: "Auto-detect / Original language" },
@@ -1707,6 +1709,9 @@ function HomePageContent() {
             </details>
           </div>
         </section>
+
+        {/* AdSense Unit (Manual Slot or Auto Ad placeholder) */}
+        <AdBanner slot={ADSENSE_SLOTS.HOME_BOTTOM} className="max-w-3xl mx-auto" />
       </div>
 
       {/* Save to My Library Modal */}

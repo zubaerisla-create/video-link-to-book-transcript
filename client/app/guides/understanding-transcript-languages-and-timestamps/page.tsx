@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, Clock, Calendar, Globe2, FileCode, Languages, CheckCircle2 } from "lucide-react";
+import { AdBanner } from "@/components/AdBanner";
+import { ADSENSE_SLOTS } from "@/lib/adsense";
 
 export const metadata: Metadata = {
   title: "Understanding YouTube Transcript Languages, Timestamps, and SRT Files",
@@ -152,6 +154,9 @@ export default function Guide5Page() {
             Because this matches the industry standard, you can directly import downloaded SRT files into Adobe Premiere Pro, Final Cut Pro, DaVinci Resolve, or VLC media player to add synchronized subtitles to any video project.
           </p>
         </section>
+
+        {/* AdSense Unit (Manual Slot or Auto Ad placeholder) */}
+        <AdBanner slot={ADSENSE_SLOTS.ARTICLE_BOTTOM} />
 
         {/* Related Guides */}
         <div className="pt-8 border-t border-[#F0E8E2] space-y-4">

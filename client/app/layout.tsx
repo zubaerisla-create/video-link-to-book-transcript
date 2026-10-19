@@ -7,8 +7,9 @@ import { Footer } from "@/components/Footer";
 import { AuthProvider } from "@/lib/auth-context";
 import { AnalyticsTracker } from "@/components/AnalyticsTracker";
 
+import { ADSENSE_CLIENT_ID } from "@/lib/adsense";
+
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://habd.tech";
-const adsenseClientId = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -74,6 +75,9 @@ export const metadata: Metadata = {
     shortcut: "/favicon.ico",
     apple: "/apple-icon.png",
   },
+  other: {
+    "google-adsense-account": ADSENSE_CLIENT_ID,
+  },
 };
 
 export default function RootLayout({
@@ -84,18 +88,14 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
-        {adsenseClientId && adsenseClientId.startsWith("ca-pub-") && (
-          <>
-            <meta name="google-adsense-account" content={adsenseClientId} />
-            <Script
-              async
-              src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClientId}`}
-              crossOrigin="anonymous"
-              strategy="afterInteractive"
-            />
-          </>
-        )}
+        <meta name="google-adsense-account" content={ADSENSE_CLIENT_ID} />
+        <Script
+          id="google-adsense-script"
+          async
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}`}
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
       </head>
       <body className="min-h-full flex flex-col bg-[#FFFDF8] text-[#292522]">
         <AuthProvider>
