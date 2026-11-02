@@ -1133,7 +1133,7 @@ def get_user_activity_detail(db: Session, user_id: str) -> Optional[Dict[str, An
             "start_time": row[4].isoformat() if row[4] else None,
             "end_time": row[5].isoformat() if row[5] else None,
             "duration_seconds": row[6],
-            "reading_progress": round(row[7] * 100.0, 1),
+            "reading_progress": round(row[7], 1),
             "last_page_read": row[8],
             "device_type": row[9] or "desktop",
         }
@@ -1184,7 +1184,7 @@ def get_user_activity_detail(db: Session, user_id: str) -> Optional[Dict[str, An
             "channel_title": b.channel_title,
             "language_name": b.language_name,
             "word_count": b.word_count,
-            "reading_progress": round(b.reading_progress * 100.0, 1),
+            "reading_progress": round(b.reading_progress, 1),
             "last_page_read": b.last_page_read,
             "total_pages": b.total_pages,
             "created_at": b.created_at.isoformat() if b.created_at else None,

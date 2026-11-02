@@ -466,7 +466,7 @@ export async function collectAnalyticsEventApi(payload: {
   browser?: string;
   os?: string;
   duration_ms?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }): Promise<{ status: string }> {
   const res = await fetch(`${API_BASE_URL}/api/analytics/collect`, {
     method: "POST",

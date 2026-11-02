@@ -19,7 +19,7 @@
 
 html,
 body {
-  overflow-x: hidden;
+  overflow-x: clip;
   max-width: 100%;
   background-color: #FFFDF8;
   color: #292522;

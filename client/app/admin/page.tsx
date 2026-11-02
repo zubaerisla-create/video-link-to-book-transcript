@@ -6,7 +6,6 @@ import {
   Users,
   Eye,
   Activity,
-  UserCheck,
   BookOpen,
   CheckCircle2,
   TrendingUp,
@@ -14,13 +13,10 @@ import {
   RefreshCw,
   AlertTriangle,
   ArrowRight,
-  ShieldAlert,
-  Smartphone,
   Globe,
   Clock,
   BookMarked,
   Award,
-  Flame,
 } from "lucide-react";
 import { getAdminOverviewApi } from "@/lib/api";
 import { AdminOverviewResponse } from "@/lib/types";
@@ -52,8 +48,8 @@ export default function AdminOverviewPage() {
       try {
         const res = await getAdminOverviewApi(r, f, t);
         setData(res);
-      } catch (err: any) {
-        setError(err.message || "Failed to load admin overview metrics.");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to load admin overview metrics.");
       } finally {
         setIsLoading(false);
       }
@@ -62,8 +58,26 @@ export default function AdminOverviewPage() {
   );
 
   useEffect(() => {
-    fetchOverview(range, fromDate, toDate);
-  }, [range, fromDate, toDate, fetchOverview]);
+    let active = true;
+    getAdminOverviewApi(range, fromDate, toDate)
+      .then((res) => {
+        if (active) {
+          setData(res);
+          setError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (active) {
+          setError(err instanceof Error ? err.message : "Failed to load admin overview metrics.");
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [range, fromDate, toDate]);
 
   const handleRangeChange = (newRange: string, f?: string, t?: string) => {
     setRange(newRange);

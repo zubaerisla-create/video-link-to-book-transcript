@@ -11,28 +11,23 @@ import {
   ExternalLink,
   FileText,
   Globe,
-  Languages,
   Loader2,
-  Save,
   ShieldCheck,
   AlertCircle,
-  ArrowRight,
-  Clock,
   Sparkles,
   LogIn,
   UserPlus,
-  RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { getStagedTranscriptApi, saveBookApi, ApiError } from "@/lib/api";
-import { TranscriptResponse, TranscriptSegment } from "@/lib/types";
+import { TranscriptResponse } from "@/lib/types";
 
 function ImportContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tokenFromUrl = searchParams.get("token");
 
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   const [transcript, setTranscript] = useState<TranscriptResponse | null>(null);
   const [bookTitle, setBookTitle] = useState("");
@@ -206,7 +201,7 @@ function ImportContent() {
   return (
     <div className="min-h-screen bg-[#FFFDF8] text-[#292522]">
       {/* Top Banner / Navbar minimal indicator */}
-      <div className="border-b border-[#F0E8E2] bg-white/80 backdrop-blur-md sticky top-0 z-30 px-4 sm:px-6 py-3.5">
+      <div className="border-b border-[#F0E8E2] bg-white/80 backdrop-blur-md sticky top-16 z-30 px-4 sm:px-6 py-3.5">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5 font-serif text-lg sm:text-xl font-bold tracking-tight text-[#292522]">
             <Image
@@ -228,7 +223,7 @@ function ImportContent() {
         </div>
       </div>
 
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
+      <div className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
         {/* Loading state */}
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -286,7 +281,7 @@ function ImportContent() {
                   Review & Save Transcript
                 </h1>
                 <p className="text-sm text-[#7D7571] mt-1">
-                  Captured directly from YouTube's native transcript reader without datacenter rate limits.
+                  Captured directly from YouTube&apos;s native transcript reader without datacenter rate limits.
                 </p>
               </div>
 
@@ -491,7 +486,7 @@ function ImportContent() {
             </div>
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 }

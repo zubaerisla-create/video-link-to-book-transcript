@@ -49,6 +49,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description: category.intro.slice(0, 158).replace(/\s\S*$/, "") + "…",
       alternates: { canonical: `/guides/${category.slug}` },
       openGraph: { type: "website", url: `/guides/${category.slug}`, title: `${category.name} Guides — Transcriptly`, description: category.description },
+      twitter: { card: "summary", title: `${category.name} Guides — Transcriptly`, description: category.description },
     };
   }
   const guide = GUIDE_BY_SLUG.get(slug);

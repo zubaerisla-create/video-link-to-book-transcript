@@ -20,6 +20,12 @@ export const metadata: Metadata = {
     description:
       "Practical guides on video transcripts, study workflows, language learning and transcription technology.",
   },
+  twitter: {
+    card: "summary",
+    title: "Transcriptly Guides & Knowledge Base",
+    description:
+      "Practical guides on video transcripts, study workflows, language learning and transcription technology.",
+  },
 };
 
 const CRUMBS = [

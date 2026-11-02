@@ -93,6 +93,7 @@ class Settings(BaseModel):
     SMTP_USER: str = os.getenv("SMTP_USER", "")
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "")
+    CONTACT_TO_EMAIL: str = os.getenv("CONTACT_TO_EMAIL", "")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://habd.tech")
 
 

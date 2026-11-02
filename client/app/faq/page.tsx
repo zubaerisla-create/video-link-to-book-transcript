@@ -11,6 +11,19 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/faq",
   },
+  openGraph: {
+    type: "website",
+    url: "/faq",
+    title: "Frequently Asked Questions (FAQ) | Transcriptly",
+    description:
+      "Find answers to frequently asked questions about extracting YouTube transcripts, supported URL formats, multilingual captions, translation, and our digital book reader.",
+  },
+  twitter: {
+    card: "summary",
+    title: "Frequently Asked Questions (FAQ) | Transcriptly",
+    description:
+      "Find answers to frequently asked questions about extracting YouTube transcripts, supported URL formats, multilingual captions, translation, and our digital book reader.",
+  },
 };
 
 const FAQ_ITEMS = [

@@ -4,14 +4,23 @@ import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { UserPlus, AlertCircle, BookOpen, ShieldCheck } from "lucide-react";
+import { UserPlus, AlertCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api";
+
+function getSafeRedirectTarget(raw: string | null): string {
+  if (!raw) return "/dashboard";
+  if (raw === "pending_save") return "/?save=true";
+  if (raw.startsWith("/") && !raw.startsWith("//") && !raw.startsWith("/\\")) {
+    return raw;
+  }
+  return "/dashboard";
+}
 
 function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTarget = searchParams.get("redirect") || "/dashboard";
+  const redirectTarget = getSafeRedirectTarget(searchParams.get("redirect"));
 
   const { signup } = useAuth();
   const [fullName, setFullName] = useState("");
@@ -45,12 +54,7 @@ function SignupForm() {
     try {
       setIsLoading(true);
       await signup(fullName.trim(), email.trim(), password, confirmPassword);
-
-      if (redirectTarget === "pending_save") {
-        router.push("/?save=true");
-      } else {
-        router.push(redirectTarget);
-      }
+      router.push(redirectTarget);
     } catch (err) {
       if (err instanceof ApiError) {
         setErrorMessage(err.message);

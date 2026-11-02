@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FileText, CheckCircle2, AlertTriangle, ShieldCheck, HelpCircle } from "lucide-react";
+import { AlertTriangle, ShieldCheck } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -8,6 +8,19 @@ export const metadata: Metadata = {
     "Read the Terms of Service governing your use of Transcriptly, including permitted use, intellectual property respect, account responsibilities, and service disclaimers.",
   alternates: {
     canonical: "/terms",
+  },
+  openGraph: {
+    type: "website",
+    url: "/terms",
+    title: "Terms of Service | Transcriptly",
+    description:
+      "Read the Terms of Service governing your use of Transcriptly, including permitted use, intellectual property respect, account responsibilities, and service disclaimers.",
+  },
+  twitter: {
+    card: "summary",
+    title: "Terms of Service | Transcriptly",
+    description:
+      "Read the Terms of Service governing your use of Transcriptly, including permitted use, intellectual property respect, account responsibilities, and service disclaimers.",
   },
 };
 

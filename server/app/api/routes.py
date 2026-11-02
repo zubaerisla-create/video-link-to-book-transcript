@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 from fastapi import APIRouter, HTTPException, Query, status
 
 from server.app.schemas.transcript import (
@@ -85,18 +86,6 @@ async def video_info(video_id: str = Query(..., description="11-character YouTub
     return info
 
 
-@router.get(
-    "/transcript/languages",
-    summary="List available caption languages",
-    response_model=LanguagesResponse,
-    responses={
-        400: {"model": ErrorResponse},
-        404: {"model": ErrorResponse},
-        429: {"model": ErrorResponse},
-        500: {"model": ErrorResponse},
-    },
-    tags=["Transcript"],
-)
 @router.get(
     "/transcript/languages",
     summary="List available caption languages for a YouTube video",

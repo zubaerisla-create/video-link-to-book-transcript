@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ShieldCheck, Lock, Cookie, Eye, Trash2, Mail } from "lucide-react";
+import { Lock, Cookie, Eye, Trash2, Mail } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -8,6 +8,19 @@ export const metadata: Metadata = {
     "Learn how Transcriptly collects, processes, and protects your data, including our ephemeral processing model, personal library storage, and Google AdSense cookie disclosures.",
   alternates: {
     canonical: "/privacy",
+  },
+  openGraph: {
+    type: "website",
+    url: "/privacy",
+    title: "Privacy Policy | Transcriptly",
+    description:
+      "Learn how Transcriptly collects, processes, and protects your data, including our ephemeral processing model, personal library storage, and Google AdSense cookie disclosures.",
+  },
+  twitter: {
+    card: "summary",
+    title: "Privacy Policy | Transcriptly",
+    description:
+      "Learn how Transcriptly collects, processes, and protects your data, including our ephemeral processing model, personal library storage, and Google AdSense cookie disclosures.",
   },
 };
 
@@ -69,7 +82,7 @@ export default function PrivacyPolicyPage() {
               <ul className="text-xs sm:text-sm space-y-2 list-disc list-inside">
                 <li><strong>Account Credentials:</strong> When you register, we store your full name, email address, and a securely salted and hashed password (using industry-standard bcrypt).</li>
                 <li><strong>Personal Digital Library:</strong> Only transcripts you explicitly choose to save (&ldquo;Save to My Library&rdquo;) are saved to our persistent database on our secure VPS.</li>
-                <li><strong>Private Access:</strong> Your saved books, bookmarks, and reading progress are strictly private and accessible only by logging into your authenticated account.</li>
+                <li><strong>Private Access:</strong> Your saved books, bookmarks, reading session progress, and reading duration metrics are strictly private and accessible only to your authenticated account (and aggregate system diagnostics).</li>
               </ul>
             </div>
           </div>
@@ -77,7 +90,7 @@ export default function PrivacyPolicyPage() {
           <h3 className="pt-4 text-base font-bold text-[#292522]">Other data we process</h3>
           <ul className="text-xs sm:text-sm space-y-2 list-disc list-inside">
             <li><strong>First-party usage analytics:</strong> To understand how the site is used, we record page views and a small set of events (for example, a transcript being extracted or a book being saved). Each event includes a random pseudonymous visitor ID and session ID (stored in your browser&apos;s local storage and in first-party cookies), the page path, the referring domain, and your device type, browser and operating system as inferred from your user agent. We do not store your IP address with these events, we never record transcript text in analytics, and known bots are filtered out. Events are linked to your account if you are signed in, and the account-registration event records the email address you signed up with.</li>
-            <li><strong>Chrome extension imports:</strong> When you click &ldquo;Import&rdquo; in the Transcriptly extension, the transcript, video title, channel and URL are sent to our server and held under a random single-use token for up to five minutes so the import page can load them. Unused imports expire and are deleted automatically.</li>
+            <li><strong>Chrome extension and subtitle upload imports:</strong> When you click &ldquo;Import&rdquo; in the Transcriptly extension or upload/paste subtitle text on the homepage, the transcript, video title, channel and URL are sent to our server and held under a random single-use token for up to five minutes so the reader or import page can load them. Unused imports expire and are deleted automatically.</li>
             <li><strong>Speech-to-text fallback:</strong> If you choose to transcribe a video without captions, our server downloads that video&apos;s audio track temporarily, transcribes it with an open-source model running on our own server, and deletes the audio file after processing. No third-party transcription service receives the audio.</li>
             <li><strong>Translation and word lookup:</strong> When you translate a transcript and YouTube does not provide its own translation, the transcript text is sent to the MyMemory translation service. When you look up a word in the reader, the word (not the surrounding text) may be sent to free dictionary services such as Datamuse and Wiktionary, and to MyMemory for a Bangla translation. Those services have their own privacy policies.</li>
             <li><strong>Vocabulary list:</strong> Words you save from the reader are stored in your account together with their meaning, any notes you add, their learning status and the title of the book they came from.</li>

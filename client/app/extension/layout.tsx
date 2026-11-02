@@ -7,6 +7,19 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/extension",
   },
+  openGraph: {
+    type: "website",
+    url: "/extension",
+    title: "Download the Transcriptly Chrome Extension | Transcriptly",
+    description:
+      "Download the free Transcriptly Chrome extension and follow the step-by-step installation guide with illustrations and a tutorial video.",
+  },
+  twitter: {
+    card: "summary",
+    title: "Download the Transcriptly Chrome Extension | Transcriptly",
+    description:
+      "Download the free Transcriptly Chrome extension and follow the step-by-step installation guide.",
+  },
 };
 
 export default function ExtensionLayout({ children }: { children: React.ReactNode }) {

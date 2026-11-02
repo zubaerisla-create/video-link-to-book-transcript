@@ -150,7 +150,7 @@ export function Footer() {
         <div className="border-t border-[#F0E8E2] pt-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-[#77716D] text-center md:text-left">
           <p>© {currentYear} Transcriptly. All rights reserved.</p>
           <p className="max-w-xl text-[11px] leading-relaxed">
-            Guest requests are processed strictly in-memory. Personal library persistence is available for registered users. Transcriptly is not affiliated with or endorsed by YouTube.
+            Guest URL requests are processed in-memory, and extension or file uploads are staged for up to 5 minutes until opened. Personal library persistence is available for registered users. Transcriptly is not affiliated with or endorsed by YouTube.
           </p>
         </div>
       </div>

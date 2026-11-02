@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Mail, MessageSquare, Send, CheckCircle2, Clock, HelpCircle, AlertCircle } from "lucide-react";
+import { Mail, Send, CheckCircle2, Clock, HelpCircle, AlertCircle } from "lucide-react";
 
 const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "";
 
@@ -27,10 +27,15 @@ export default function ContactPage() {
       return;
     }
 
-    // Basic email check
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailPattern.test(formData.email)) {
+    // Strict email check
+    const emailPattern = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
+    if (!emailPattern.test(formData.email.trim())) {
       setErrorMessage("Please provide a valid email address.");
+      return;
+    }
+
+    if (formData.message.trim().length < 10 || formData.message.trim().length > 5000) {
+      setErrorMessage("Please provide a message between 10 and 5,000 characters.");
       return;
     }
 

@@ -52,7 +52,7 @@ export function Navbar() {
         </Link>
 
         {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center gap-4">
+        <div className="hidden lg:flex items-center gap-4">
           <nav className="flex items-center gap-1">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
@@ -127,7 +127,7 @@ export function Navbar() {
         </div>
 
         {/* Mobile Hamburger Button */}
-        <div className="flex items-center gap-2 md:hidden shrink-0">
+        <div className="flex items-center gap-2 lg:hidden shrink-0">
           <a
             href={githubUrl}
             target="_blank"
@@ -141,6 +141,7 @@ export function Navbar() {
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle navigation menu"
+            aria-expanded={mobileMenuOpen}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#F0E8E2] bg-white text-[#292522] shadow-xs hover:bg-[#FFFDF8] transition-colors"
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -150,7 +151,7 @@ export function Navbar() {
 
       {/* Mobile Dropdown Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-[#F0E8E2] bg-[#FFFDF8] px-4 pt-2 pb-5 space-y-3 shadow-lg">
+        <div className="lg:hidden border-b border-[#F0E8E2] bg-[#FFFDF8] px-4 pt-2 pb-5 space-y-3 shadow-lg">
           <nav className="flex flex-col space-y-1">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;

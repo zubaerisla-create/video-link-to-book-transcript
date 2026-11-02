@@ -21,7 +21,7 @@ export async function sendEmail({
   text?: string;
   replyTo?: string;
 }) {
-  const fromAddress = process.env.SMTP_FROM || `"Transcriptly" <${process.env.SMTP_USER || "zubaerisla@gmail.com"}>`;
+  const fromAddress = process.env.SMTP_FROM || `"Transcriptly" <${process.env.SMTP_USER || "noreply@habd.tech"}>`;
 
   return mailTransporter.sendMail({
     from: fromAddress,

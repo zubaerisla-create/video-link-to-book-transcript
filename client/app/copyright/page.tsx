@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ShieldCheck, FileText, CheckCircle2, AlertOctagon, Mail } from "lucide-react";
+import { FileText, AlertOctagon, Mail } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Copyright Policy & Content Removal",
@@ -9,10 +9,23 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/copyright",
   },
+  openGraph: {
+    type: "website",
+    url: "/copyright",
+    title: "Copyright Policy & Content Removal | Transcriptly",
+    description:
+      "Review Transcriptly's Copyright Policy, Fair Use guidelines, and the procedure for creators and copyright owners to request content exclusion or removal.",
+  },
+  twitter: {
+    card: "summary",
+    title: "Copyright Policy & Content Removal | Transcriptly",
+    description:
+      "Review Transcriptly's Copyright Policy, Fair Use guidelines, and the procedure for creators and copyright owners to request content exclusion or removal.",
+  },
 };
 
 export default function CopyrightPolicyPage() {
-  const lastUpdated = "October 16, 2026";
+  const lastUpdated = "November 2, 2026";
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-16">
@@ -40,7 +53,7 @@ export default function CopyrightPolicyPage() {
             Transcriptly is a technical utility that retrieves public closed-caption tracks and auto-generated subtitle streams made publicly available by creators on YouTube. Transcriptly:
           </p>
           <ul className="list-disc list-inside space-y-1.5 text-xs sm:text-sm">
-            <li><strong>Does not host, store, or stream YouTube video or audio files.</strong></li>
+            <li><strong>Does not permanently host, store, or stream YouTube video or audio files</strong> (when optional speech-to-text fallback is enabled, audio is processed in a temporary file and deleted immediately after transcription).</li>
             <li><strong>Does not bypass access controls, DRM, paywalls, or privacy settings.</strong></li>
             <li><strong>Does not claim ownership or copyright over any spoken words, subtitles, or captions extracted via the Service.</strong></li>
           </ul>

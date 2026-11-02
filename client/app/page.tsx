@@ -40,7 +40,6 @@ import {
   TranscriptResponse,
   ParagraphLengthMode,
   LanguageMode,
-  TranscriptLanguage,
 } from "@/lib/types";
 import { isValidYouTubeUrl } from "@/lib/validation";
 import { AdBanner } from "@/components/AdBanner";
@@ -59,6 +58,7 @@ const PRESET_LANGUAGES = [
   { code: "de", name: "German (Deutsch)" },
   { code: "ja", name: "Japanese (日本語)" },
   { code: "pt", name: "Portuguese (Português)" },
+  { code: "ru", name: "Russian (Русский)" },
   { code: "zh", name: "Chinese (中文)" },
 ];
 
@@ -73,6 +73,7 @@ const TRANSLATION_TARGET_LANGUAGES = [
   { code: "de", name: "German (Deutsch)" },
   { code: "ja", name: "Japanese (日本語)" },
   { code: "pt", name: "Portuguese (Português)" },
+  { code: "ru", name: "Russian (Русский)" },
   { code: "zh", name: "Chinese (中文)" },
 ];
 
@@ -133,7 +134,8 @@ function HomePageContent() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const shouldSave = params.get("save") === "true";
-    if (shouldSave) {
+    if (!shouldSave) return;
+    const timer = window.setTimeout(() => {
       try {
         const raw = sessionStorage.getItem("transcriptly_pending_save");
         if (raw) {
@@ -146,7 +148,8 @@ function HomePageContent() {
       } catch {
         // invalid JSON
       }
-    }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Active view states
@@ -1379,7 +1382,7 @@ function HomePageContent() {
                       "acceptedAnswer": {
                         "@type": "Answer",
                         "text":
-                          "Copy any YouTube video link, paste it into the URL field above, and click Extract Transcript. Transcriptly immediately extracts available captions and formats them into clean paragraphs.",
+                          "Copy any YouTube video link, paste it into the URL field above, and click Get Transcript. Transcriptly immediately extracts available captions and formats them into clean paragraphs.",
                       },
                     },
                     {
@@ -1415,7 +1418,7 @@ function HomePageContent() {
                       "acceptedAnswer": {
                         "@type": "Answer",
                         "text":
-                          "Transcripts can be exported as plain text (.txt), SubRip subtitle files (.srt) with millisecond timecodes, structured JSON (.json), and formatted PDF books.",
+                          "Transcripts can be downloaded directly as plain text (.txt), SubRip subtitle files (.srt) with millisecond timecodes, or structured JSON (.json), and exported as formatted PDF books after saving to your personal library.",
                       },
                     },
                   ],
@@ -1462,7 +1465,7 @@ function HomePageContent() {
                 <span className="text-3xl font-black text-[#E9A9C3] mb-3 block">03</span>
                 <h3 className="font-bold text-base text-[#292522] mb-2">Read, Save & Export</h3>
                 <p className="text-xs sm:text-sm text-[#77716D] leading-relaxed">
-                  Copy to clipboard with one click, download SRT/TXT/PDF files, or save to your personal library to read distraction-free.
+                  Copy to clipboard with one click, download SRT/TXT/JSON files directly, or save to your personal library to read distraction-free and export formatted PDFs.
                 </p>
               </div>
             </div>
@@ -1677,7 +1680,7 @@ function HomePageContent() {
                 </span>
               </summary>
               <p className="mt-3 text-xs sm:text-sm text-[#77716D] leading-relaxed border-t border-[#F0E8E2]/60 pt-3">
-                Copy the link of any public YouTube video, paste it into the URL box at the top of the page, and click &ldquo;Extract Transcript&rdquo;. Transcriptly fetches available caption tracks and assembles them into clean reading paragraphs within seconds.
+                Copy the link of any public YouTube video, paste it into the URL box at the top of the page, and click &ldquo;Get Transcript&rdquo;. Transcriptly fetches available caption tracks and assembles them into clean reading paragraphs within seconds.
               </p>
             </details>
 
@@ -1955,7 +1958,7 @@ function HomePageContent() {
               </div>
 
               <div className="rounded-xl bg-[#FFF1B8]/40 border border-[#F0E8E2] p-3 text-[11px] text-[#433422] leading-relaxed">
-                💡 <strong>Privacy notice:</strong> Please only upload or paste subtitle files you have permission to use. Your transcript is parsed locally and staged privately for your reading session.
+                💡 <strong>Privacy notice:</strong> Please only upload or paste subtitle files you have permission to use. Your subtitle text is parsed and staged privately on our server for up to 5 minutes using a single-use import token.
               </div>
 
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#F0E8E2]">

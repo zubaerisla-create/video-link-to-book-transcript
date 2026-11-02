@@ -28,16 +28,34 @@ export default function AdminHealthPage() {
     try {
       const res = await getAdminSystemHealthApi();
       setData(res);
-    } catch (err: any) {
-      setError(err.message || "Failed to load system health diagnostics.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load system health diagnostics.");
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchHealth();
-  }, [fetchHealth]);
+    let active = true;
+    getAdminSystemHealthApi()
+      .then((res) => {
+        if (active) {
+          setData(res);
+          setError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (active) {
+          setError(err instanceof Error ? err.message : "Failed to load system health diagnostics.");
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="space-y-6 sm:space-y-8">

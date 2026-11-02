@@ -29,7 +29,7 @@ const SUBJECTS: Record<string, string> = {
   copyright: "Copyright notice",
 };
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
 const MAX_BODY_BYTES = 16 * 1024;
 
 const IP_WINDOW_MS = 10 * 60 * 1000;
@@ -87,8 +87,8 @@ function sameOrigin(req: NextRequest): boolean {
   const origin = req.headers.get("origin");
   if (!origin) return true; // non-browser clients; still rate limited
   try {
-    const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
-    return new URL(origin).host === host;
+    const host = req.headers.get("host");
+    return Boolean(host && new URL(origin).host === host);
   } catch {
     return false;
   }

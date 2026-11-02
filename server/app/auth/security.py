@@ -35,6 +35,7 @@ def create_access_token(user_id: str, email: str, expires_delta: Optional[dateti
     payload = {
         "sub": user_id,
         "email": email,
+        "purpose": "access",
         "exp": expire,
         "iat": datetime.datetime.now(datetime.timezone.utc),
     }
@@ -44,6 +45,9 @@ def create_access_token(user_id: str, email: str, expires_delta: Optional[dateti
 def decode_access_token(token: str) -> Optional[dict]:
     try:
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        # Reject tokens issued for other purposes (e.g., password_reset)
+        if payload.get("purpose") not in (None, "access"):
+            return None
         return payload
     except (jwt.PyJWTError, Exception):
         return None

@@ -4,12 +4,10 @@ import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   ShieldAlert,
-  Shield,
   RefreshCw,
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
-  Clock,
   User,
   AlertTriangle,
 } from "lucide-react";
@@ -30,16 +28,34 @@ export default function AdminAuditLogsPage() {
     try {
       const res = await getAdminAuditLogsApi(page, limit);
       setData(res);
-    } catch (err: any) {
-      setError(err.message || "Failed to load administrative audit trail.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load administrative audit trail.");
     } finally {
       setIsLoading(false);
     }
   }, [page, limit]);
 
   useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+    let active = true;
+    getAdminAuditLogsApi(page, limit)
+      .then((res) => {
+        if (active) {
+          setData(res);
+          setError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (active) {
+          setError(err instanceof Error ? err.message : "Failed to load administrative audit trail.");
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [page, limit]);
 
   return (
     <div className="space-y-6 sm:space-y-8">

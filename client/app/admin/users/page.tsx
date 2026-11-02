@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   Users,
   Search,
-  Filter,
   CheckCircle2,
   XCircle,
   Shield,
@@ -13,16 +12,9 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
-  BookOpen,
-  Calendar,
-  Lock,
-  Unlock,
-  UserCheck,
   UserX,
   Clock,
-  BookMarked,
   Award,
-  Eye,
   X,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -77,8 +69,8 @@ export default function AdminUsersPage() {
     try {
       const detail = await getAdminUserDetailApi(userId);
       setSelectedUserDetail(detail);
-    } catch (err: any) {
-      setDetailError(err.message || "Failed to load user activity details.");
+    } catch (err: unknown) {
+      setDetailError(err instanceof Error ? err.message : "Failed to load user activity details.");
     } finally {
       setIsDetailLoading(false);
     }
@@ -90,16 +82,34 @@ export default function AdminUsersPage() {
     try {
       const res = await getAdminUsersApi(page, limit, search, statusFilter, roleFilter);
       setData(res);
-    } catch (err: any) {
-      setError(err.message || "Failed to load user accounts.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load user accounts.");
     } finally {
       setIsLoading(false);
     }
   }, [page, limit, search, statusFilter, roleFilter]);
 
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    let active = true;
+    getAdminUsersApi(page, limit, search, statusFilter, roleFilter)
+      .then((res) => {
+        if (active) {
+          setData(res);
+          setError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (active) {
+          setError(err instanceof Error ? err.message : "Failed to load user accounts.");
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [page, limit, search, statusFilter, roleFilter]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,8 +144,8 @@ export default function AdminUsersPage() {
       }
       setActionTarget(null);
       await fetchUsers();
-    } catch (err: any) {
-      setFeedbackMsg({ type: "error", text: err.message || "Action failed." });
+    } catch (err: unknown) {
+      setFeedbackMsg({ type: "error", text: err instanceof Error ? err.message : "Action failed." });
     } finally {
       setIsSubmitting(false);
     }

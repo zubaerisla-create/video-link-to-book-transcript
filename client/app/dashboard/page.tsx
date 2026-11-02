@@ -1,27 +1,16 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   BookOpen,
   Search,
-  SlidersHorizontal,
-  ExternalLink,
-  Calendar,
-  Clock,
   Trash2,
   Edit2,
-  Download,
   Plus,
-  RotateCcw,
   AlertCircle,
-  FileText,
   FileDown,
-  Globe2,
-  Check,
-  X,
-  Languages,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -29,7 +18,6 @@ import {
   updateBookApi,
   deleteBookApi,
   getBookPdfUrl,
-  getBookExportUrl,
   ApiError,
 } from "@/lib/api";
 import { BookSummary } from "@/lib/types";
@@ -63,12 +51,13 @@ export default function DashboardPage() {
   }, [authLoading, isAuthenticated, router]);
 
   // Load books
-  const fetchBooks = async () => {
+  const fetchBooks = useCallback(async (queryOverride?: string) => {
     if (!isAuthenticated) return;
     try {
       setIsLoading(true);
       setError(null);
-      const res = await listBooksApi(searchQuery, sortOption);
+      const q = queryOverride !== undefined ? queryOverride : searchQuery;
+      const res = await listBooksApi(q, sortOption);
       setBooks(res.books);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -79,17 +68,34 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isAuthenticated, searchQuery, sortOption]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchBooks();
-    }
-  }, [isAuthenticated, sortOption]);
+    if (!isAuthenticated) return;
+    let active = true;
+    listBooksApi(searchQuery, sortOption)
+      .then((res) => {
+        if (active) {
+          setBooks(res.books);
+          setError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (active) {
+          setError(err instanceof ApiError ? err.message : "Failed to load your library books.");
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated, sortOption, searchQuery]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchBooks();
+    void fetchBooks(searchQuery);
   };
 
   const handleRenameConfirm = async (e: React.FormEvent) => {
@@ -101,7 +107,7 @@ export default function DashboardPage() {
       const updated = await updateBookApi(editingBook.id, { title: newTitle.trim() });
       setBooks((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
       setEditingBook(null);
-    } catch (err) {
+    } catch {
       alert("Failed to rename book. Please try again.");
     } finally {
       setIsRenaming(false);

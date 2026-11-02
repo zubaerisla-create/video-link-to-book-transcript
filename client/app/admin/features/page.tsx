@@ -12,12 +12,10 @@ import {
   RefreshCw,
   ArrowLeft,
   Percent,
-  FileText,
 } from "lucide-react";
 import { getAdminFeatureUsageApi } from "@/lib/api";
 import { AdminFeatureUsageResponse } from "@/lib/types";
 import { DateRangeFilter } from "@/components/admin/DateRangeFilter";
-import { BreakdownBarList } from "@/components/admin/ChartComponents";
 
 export default function AdminFeaturesPage() {
   const [data, setData] = useState<AdminFeatureUsageResponse | null>(null);
@@ -33,16 +31,34 @@ export default function AdminFeaturesPage() {
     try {
       const res = await getAdminFeatureUsageApi(r, f, t);
       setData(res);
-    } catch (err: any) {
-      setError(err.message || "Failed to load feature usage telemetry.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load feature usage telemetry.");
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchFeatures(range, fromDate, toDate);
-  }, [range, fromDate, toDate, fetchFeatures]);
+    let active = true;
+    getAdminFeatureUsageApi(range, fromDate, toDate)
+      .then((res) => {
+        if (active) {
+          setData(res);
+          setError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (active) {
+          setError(err instanceof Error ? err.message : "Failed to load feature usage telemetry.");
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [range, fromDate, toDate]);
 
   const handleRangeChange = (newRange: string, f?: string, t?: string) => {
     setRange(newRange);

@@ -4,10 +4,21 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "How It Works | Transcriptly",
+  title: "How It Works",
   description: "Learn how Transcriptly extracts and formats YouTube captions into readable transcripts.",
   alternates: {
     canonical: "/how-it-works",
+  },
+  openGraph: {
+    type: "website",
+    url: "/how-it-works",
+    title: "How It Works | Transcriptly",
+    description: "Learn how Transcriptly extracts and formats YouTube captions into readable transcripts.",
+  },
+  twitter: {
+    card: "summary",
+    title: "How It Works | Transcriptly",
+    description: "Learn how Transcriptly extracts and formats YouTube captions into readable transcripts.",
   },
 };
 
