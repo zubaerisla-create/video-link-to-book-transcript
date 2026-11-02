@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { Mail, MessageSquare, Send, CheckCircle2, Clock, HelpCircle, AlertCircle } from "lucide-react";
 
+const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "";
+
 export default function ContactPage() {
   const [formData, setFormData] = useState({
     name: "",
@@ -14,8 +16,9 @@ export default function ContactPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [honeypot, setHoneypot] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -32,18 +35,24 @@ export default function ContactPage() {
     }
 
     setIsSubmitting(true);
-
-    // Client-side simulation of inquiry dispatch
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setIsSuccess(true);
-      setFormData({
-        name: "",
-        email: "",
-        subject: "general",
-        message: "",
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...formData, website: honeypot }),
       });
-    }, 600);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorMessage(data.error || "Your message could not be sent. Please try again later.");
+        return;
+      }
+      setIsSuccess(true);
+      setFormData({ name: "", email: "", subject: "general", message: "" });
+    } catch {
+      setErrorMessage("Network error. Please check your connection and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -69,16 +78,27 @@ export default function ContactPage() {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF1B8] text-[#292522] mb-3">
                 <Mail className="h-5 w-5" />
               </div>
-              <h2 className="text-base font-bold text-[#292522]">Direct Email</h2>
-              <p className="mt-1 text-xs text-[#77716D] leading-relaxed">
-                Send your general inquiries or support requests directly to our team:
-              </p>
-              <a
-                href="mailto:support@transcriptly.net"
-                className="mt-2 inline-block text-xs sm:text-sm font-semibold text-[#292522] underline hover:text-[#E9A9C3]"
-              >
-                support@transcriptly.net
-              </a>
+              {CONTACT_EMAIL ? (
+                <>
+                  <h2 className="text-base font-bold text-[#292522]">Direct Email</h2>
+                  <p className="mt-1 text-xs text-[#77716D] leading-relaxed">
+                    Prefer email? Write to us directly:
+                  </p>
+                  <a
+                    href={`mailto:${CONTACT_EMAIL}`}
+                    className="mt-2 inline-block break-all text-xs sm:text-sm font-semibold text-[#292522] underline hover:text-[#E9A9C3]"
+                  >
+                    {CONTACT_EMAIL}
+                  </a>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-base font-bold text-[#292522]">Message Us</h2>
+                  <p className="mt-1 text-xs text-[#77716D] leading-relaxed">
+                    Use the form to reach us. Messages go straight to the person who maintains Transcriptly, and replies come from a real inbox.
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="border-t border-[#F0E8E2] pt-4">
@@ -87,7 +107,7 @@ export default function ContactPage() {
                 <span>Response Time</span>
               </div>
               <p className="text-xs text-[#77716D] leading-relaxed">
-                We typically respond within <strong>24 to 48 business hours</strong>.
+                We read every message and aim to reply within a few days.
               </p>
             </div>
 
@@ -136,6 +156,13 @@ export default function ContactPage() {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Honeypot field for bots; hidden from people and assistive tech */}
+                <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
+                  <label>
+                    Leave this field empty
+                    <input type="text" tabIndex={-1} autoComplete="off" value={honeypot} onChange={(e) => setHoneypot(e.target.value)} />
+                  </label>
+                </div>
                 {errorMessage && (
                   <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
                     <AlertCircle className="h-4 w-4 shrink-0" />

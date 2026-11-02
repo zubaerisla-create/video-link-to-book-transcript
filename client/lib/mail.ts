@@ -13,17 +13,20 @@ export async function sendEmail({
   subject,
   html,
   text,
+  replyTo,
 }: {
   to: string;
   subject: string;
   html: string;
   text?: string;
+  replyTo?: string;
 }) {
   const fromAddress = process.env.SMTP_FROM || `"Transcriptly" <${process.env.SMTP_USER || "zubaerisla@gmail.com"}>`;
-  
+
   return mailTransporter.sendMail({
     from: fromAddress,
     to,
+    replyTo,
     subject,
     text: text || html.replace(/<[^>]+>/g, ""),
     html,

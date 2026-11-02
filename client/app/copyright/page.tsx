@@ -106,7 +106,6 @@ export default function CopyrightPolicyPage() {
             Send your notification to our designated copyright contact:
           </p>
           <div className="rounded-xl border border-[#F0E8E2] bg-white p-4 font-mono text-xs text-[#292522] space-y-1">
-            <p><strong>Email:</strong> copyright@transcriptly.net</p>
             <p><strong>Subject:</strong> DMCA / Content Removal Notice - [Your Channel or Video ID]</p>
             <p><strong>Web Form:</strong> <Link href="/contact" className="underline font-sans font-semibold text-[#292522] hover:text-[#E9A9C3]">Contact Form (Topic: Copyright & DMCA)</Link></p>
           </div>

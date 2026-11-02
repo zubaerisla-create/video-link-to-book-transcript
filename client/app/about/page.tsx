@@ -22,7 +22,7 @@ export default function AboutPage() {
     {
       title: "Privacy-First Architecture",
       description:
-        "For guest visitors, processing is 100% ephemeral in memory: video links and transcripts are discarded when the session ends. For registered members, saved books are private and strictly isolated.",
+        "For guest visitors, transcripts are never written to our database: results are held only in server memory, in a short-lived cache of up to about 10 minutes that avoids repeated requests to YouTube, and in your browser tab. For registered members, saved books are private to their account. See the Privacy Policy for details, including our first-party usage analytics.",
       icon: Lock,
     },
     {

@@ -27,7 +27,7 @@ const FAQ_ITEMS = [
       },
       {
         q: "What if a YouTube video has no captions available?",
-        a: "If a video lacks both creator-uploaded and YouTube auto-generated captions, Transcriptly can utilize an optional local speech recognition fallback powered by faster-whisper. When enabled, the audio is analyzed to detect speech and generate formatted text directly without paid third-party APIs.",
+        a: "If a video lacks both creator-uploaded and YouTube auto-generated captions, Transcriptly can use an optional speech-to-text fallback powered by faster-whisper, an open-source speech recognition model running on our own server. The audio is transcribed without any third-party transcription API, temporary audio files are deleted afterwards, and the feature is limited to shorter videos. Accuracy is generally lower than good captions. If YouTube shows captions but the website can't fetch them, use the Chrome extension instead.",
       },
       {
         q: "Why does Transcriptly say 'Could not retrieve transcript'?",
@@ -74,7 +74,7 @@ const FAQ_ITEMS = [
     questions: [
       {
         q: "Is Transcriptly free to use?",
-        a: "Yes, Transcriptly is 100% free to use for extracting transcripts, copying text, downloading SRT/JSON/TXT files, and using the digital reader.",
+        a: "Yes, Transcriptly is free to use for extracting transcripts, copying text, downloading SRT/JSON/TXT files, and using the digital reader.",
       },
       {
         q: "Is my personal data or search history tracked?",

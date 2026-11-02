@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyPolicyPage() {
-  const lastUpdated = "October 16, 2026";
+  const lastUpdated = "November 2, 2026";
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-16">
@@ -55,7 +55,7 @@ export default function PrivacyPolicyPage() {
                 <span>Guest Visitors (Default)</span>
               </div>
               <ul className="text-xs sm:text-sm space-y-2 list-disc list-inside">
-                <li><strong>Ephemeral Processing:</strong> YouTube URLs you submit are processed on-demand in temporary server memory solely to fetch publicly available caption tracks.</li>
+                <li><strong>Ephemeral Processing:</strong> YouTube URLs you submit are processed on demand to fetch publicly available caption tracks. Successful results are kept in a short-lived in-memory cache (up to about 10 minutes, keyed by video, not by visitor) so repeated requests for the same video don&apos;t hit YouTube again.</li>
                 <li><strong>No Database Storage:</strong> Neither the video URL, the video title, nor the extracted transcript text is stored in our database for guest users.</li>
                 <li><strong>Client-Side State:</strong> Transcripts are delivered directly to your web browser session and are cleared when you refresh or close the tab.</li>
               </ul>
@@ -73,6 +73,16 @@ export default function PrivacyPolicyPage() {
               </ul>
             </div>
           </div>
+
+          <h3 className="pt-4 text-base font-bold text-[#292522]">Other data we process</h3>
+          <ul className="text-xs sm:text-sm space-y-2 list-disc list-inside">
+            <li><strong>First-party usage analytics:</strong> To understand how the site is used, we record page views and a small set of events (for example, a transcript being extracted or a book being saved). Each event includes a random pseudonymous visitor ID and session ID (stored in your browser&apos;s local storage and in first-party cookies), the page path, the referring domain, and your device type, browser and operating system as inferred from your user agent. We do not store your IP address with these events, we never record transcript text in analytics, and known bots are filtered out. Events are linked to your account if you are signed in, and the account-registration event records the email address you signed up with.</li>
+            <li><strong>Chrome extension imports:</strong> When you click &ldquo;Import&rdquo; in the Transcriptly extension, the transcript, video title, channel and URL are sent to our server and held under a random single-use token for up to five minutes so the import page can load them. Unused imports expire and are deleted automatically.</li>
+            <li><strong>Speech-to-text fallback:</strong> If you choose to transcribe a video without captions, our server downloads that video&apos;s audio track temporarily, transcribes it with an open-source model running on our own server, and deletes the audio file after processing. No third-party transcription service receives the audio.</li>
+            <li><strong>Translation and word lookup:</strong> When you translate a transcript and YouTube does not provide its own translation, the transcript text is sent to the MyMemory translation service. When you look up a word in the reader, the word (not the surrounding text) may be sent to free dictionary services such as Datamuse and Wiktionary, and to MyMemory for a Bangla translation. Those services have their own privacy policies.</li>
+            <li><strong>Vocabulary list:</strong> Words you save from the reader are stored in your account together with their meaning, any notes you add, their learning status and the title of the book they came from.</li>
+            <li><strong>Contact form:</strong> Messages you send through the contact form, including your name and email address, are delivered to our inbox by email so we can reply. We use them only to respond to you.</li>
+          </ul>
         </section>
 
         {/* Third-Party Services & YouTube */}
@@ -82,7 +92,7 @@ export default function PrivacyPolicyPage() {
             Transcriptly retrieves publicly accessible closed-caption tracks and video metadata (such as video title, channel author, and thumbnail) provided by YouTube creators.
           </p>
           <p>
-            When you enter a YouTube link, our backend communicates with YouTube servers to inspect available subtitle streams. We do not download the full video files, bypass YouTube paywalls, access private or unlisted restricted videos, or circumvent digital rights management (DRM). Use of YouTube services is subject to the <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer" className="text-[#292522] underline font-medium hover:text-[#E9A9C3]">YouTube Terms of Service</a> and <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-[#292522] underline font-medium hover:text-[#E9A9C3]">Google Privacy Policy</a>.
+            When you enter a YouTube link, our backend communicates with YouTube servers to inspect available subtitle streams. We do not download video files (the only exception is the optional speech-to-text fallback described above, which temporarily downloads the audio track), bypass YouTube paywalls, access private or unlisted restricted videos, or circumvent digital rights management (DRM). Use of YouTube services is subject to the <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer" className="text-[#292522] underline font-medium hover:text-[#E9A9C3]">YouTube Terms of Service</a> and <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-[#292522] underline font-medium hover:text-[#E9A9C3]">Google Privacy Policy</a>.
           </p>
         </section>
 
@@ -121,6 +131,7 @@ export default function PrivacyPolicyPage() {
             <li><strong>Session Authentication Cookie:</strong> When you log in, an HttpOnly cookie or secure authentication token is maintained so you remain logged in during your session.</li>
             <li><strong>Local Storage (Preferences):</strong> Your reading preferences in the digital book reader (font size, reading theme such as light, sepia, or dark, continuous scroll vs page-by-page) are stored in your device&apos;s local storage.</li>
             <li><strong>Pending Save Session:</strong> If you are not logged in and choose to save a transcript, the pending transcript is temporarily held in your browser&apos;s session storage until you complete authentication.</li>
+            <li><strong>Analytics Identifiers:</strong> A random visitor ID (kept for up to one year) and session ID (kept for up to one day) are stored in local storage and first-party cookies to count visits, as described in section 2. They contain no personal information.</li>
           </ul>
         </section>
 
@@ -169,7 +180,7 @@ export default function PrivacyPolicyPage() {
             <h2>9. How to Contact Us</h2>
           </div>
           <p>
-            If you have questions, feedback, or data privacy requests concerning this Privacy Policy, please reach out through our dedicated <Link href="/contact" className="text-[#292522] underline font-semibold hover:text-[#E9A9C3]">Contact Page</Link> or send an email to <strong className="text-[#292522]">privacy@transcriptly.net</strong>.
+            If you have questions, feedback, or data privacy requests concerning this Privacy Policy, please reach out through our dedicated <Link href="/contact" className="text-[#292522] underline font-semibold hover:text-[#E9A9C3]">Contact Page</Link> (choose the topic &ldquo;Privacy &amp; Data Deletion Request&rdquo;).
           </p>
         </section>
       </div>

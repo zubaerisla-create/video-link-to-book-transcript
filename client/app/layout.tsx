@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -8,6 +9,10 @@ import { AuthProvider } from "@/lib/auth-context";
 import { AnalyticsTracker } from "@/components/AnalyticsTracker";
 
 import { ADSENSE_CLIENT_ID } from "@/lib/adsense";
+
+// The design system (globals.css) expects --font-inter; without it the
+// font-family declaration is invalid and browsers fall back to serif.
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://habd.tech";
 
@@ -86,7 +91,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <head>
         <Script
           id="google-adsense-script"
@@ -97,6 +102,31 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-[#FFFDF8] text-[#292522]">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@graph": [
+                {
+                  "@type": "Organization",
+                  "@id": `${siteUrl}/#organization`,
+                  name: "Transcriptly",
+                  url: siteUrl,
+                  logo: `${siteUrl}/logo.png`,
+                },
+                {
+                  "@type": "WebSite",
+                  "@id": `${siteUrl}/#website`,
+                  name: "Transcriptly",
+                  url: siteUrl,
+                  inLanguage: "en",
+                  publisher: { "@id": `${siteUrl}/#organization` },
+                },
+              ],
+            }).replace(/</g, "\\u003c"),
+          }}
+        />
         <AuthProvider>
           <Suspense fallback={null}>
             <AnalyticsTracker />
