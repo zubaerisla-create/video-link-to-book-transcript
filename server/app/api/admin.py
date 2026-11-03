@@ -30,10 +30,17 @@ class UpdateUserRoleRequest(BaseModel):
 
 
 def extract_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "127.0.0.1"
+    peer_ip = request.client.host if request.client else "127.0.0.1"
+    if peer_ip in {"127.0.0.1", "::1", "localhost", "testclient"}:
+        real_ip = request.headers.get("x-real-ip")
+        if real_ip and real_ip.strip():
+            return real_ip.strip()
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            hops = [ip.strip() for ip in forwarded.split(",") if ip.strip()]
+            if hops:
+                return hops[-1]
+    return peer_ip
 
 
 @router.get(

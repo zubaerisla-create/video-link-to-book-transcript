@@ -40,11 +40,11 @@ import {
   TranscriptResponse,
   ParagraphLengthMode,
   LanguageMode,
-  TranscriptLanguage,
 } from "@/lib/types";
 import { isValidYouTubeUrl } from "@/lib/validation";
 import { AdBanner } from "@/components/AdBanner";
 import { ADSENSE_SLOTS } from "@/lib/adsense";
+import { GUIDES, CATEGORIES as GUIDE_CATEGORIES } from "@/lib/guides/registry";
 
 const PRESET_LANGUAGES = [
   { code: "auto", name: "Auto-detect / Original language" },
@@ -58,6 +58,7 @@ const PRESET_LANGUAGES = [
   { code: "de", name: "German (Deutsch)" },
   { code: "ja", name: "Japanese (日本語)" },
   { code: "pt", name: "Portuguese (Português)" },
+  { code: "ru", name: "Russian (Русский)" },
   { code: "zh", name: "Chinese (中文)" },
 ];
 
@@ -72,6 +73,7 @@ const TRANSLATION_TARGET_LANGUAGES = [
   { code: "de", name: "German (Deutsch)" },
   { code: "ja", name: "Japanese (日本語)" },
   { code: "pt", name: "Portuguese (Português)" },
+  { code: "ru", name: "Russian (Русский)" },
   { code: "zh", name: "Chinese (中文)" },
 ];
 
@@ -132,7 +134,8 @@ function HomePageContent() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const shouldSave = params.get("save") === "true";
-    if (shouldSave) {
+    if (!shouldSave) return;
+    const timer = window.setTimeout(() => {
       try {
         const raw = sessionStorage.getItem("transcriptly_pending_save");
         if (raw) {
@@ -145,7 +148,8 @@ function HomePageContent() {
       } catch {
         // invalid JSON
       }
-    }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Active view states
@@ -779,10 +783,10 @@ function HomePageContent() {
                   <div className="text-xs">
                     <span className="font-semibold text-[#292522] flex items-center gap-1">
                       <Mic className="h-3 w-3 text-[#E9A9C3]" />
-                      Local Speech Recognition Fallback
+                      Speech-to-Text Fallback
                     </span>
                     <p className="text-[#77716D] text-[11px] leading-tight mt-0.5">
-                      Transcribes audio via faster-whisper if captions are disabled.
+                      Transcribes the audio on our server with faster-whisper if captions are unavailable (shorter videos only).
                     </p>
                   </div>
                 </label>
@@ -1333,7 +1337,7 @@ function HomePageContent() {
               <ShieldCheck className="h-4 w-4 text-[#292522]" />
               <span>
                 {result.transcription_method === "speech_recognition"
-                  ? "Audio was processed entirely on your local machine using faster-whisper. Temporary files were cleaned up."
+                  ? "Audio was transcribed on the Transcriptly server using faster-whisper (no third-party transcription API). Temporary audio files were deleted after processing."
                   : "Extracted directly from official YouTube caption streams without third-party audio downloading."}
               </span>
             </div>
@@ -1358,7 +1362,7 @@ function HomePageContent() {
                 {
                   "@type": "WebApplication",
                   "name": "Transcriptly",
-                  "url": "https://transcriptly.net",
+                  "url": process.env.NEXT_PUBLIC_SITE_URL || "https://habd.tech",
                   "description":
                     "Extract clean captions from YouTube videos into readable paragraphs, bilingual translations, and personal digital books.",
                   "applicationCategory": "UtilityApplication",
@@ -1378,7 +1382,7 @@ function HomePageContent() {
                       "acceptedAnswer": {
                         "@type": "Answer",
                         "text":
-                          "Copy any YouTube video link, paste it into the URL field above, and click Extract Transcript. Transcriptly immediately extracts available captions and formats them into clean paragraphs.",
+                          "Copy any YouTube video link, paste it into the URL field above, and click Get Transcript. Transcriptly immediately extracts available captions and formats them into clean paragraphs.",
                       },
                     },
                     {
@@ -1414,7 +1418,7 @@ function HomePageContent() {
                       "acceptedAnswer": {
                         "@type": "Answer",
                         "text":
-                          "Transcripts can be exported as plain text (.txt), SubRip subtitle files (.srt) with millisecond timecodes, structured JSON (.json), and formatted PDF books.",
+                          "Transcripts can be downloaded directly as plain text (.txt), SubRip subtitle files (.srt) with millisecond timecodes, or structured JSON (.json), and exported as formatted PDF books after saving to your personal library.",
                       },
                     },
                   ],
@@ -1461,7 +1465,7 @@ function HomePageContent() {
                 <span className="text-3xl font-black text-[#E9A9C3] mb-3 block">03</span>
                 <h3 className="font-bold text-base text-[#292522] mb-2">Read, Save & Export</h3>
                 <p className="text-xs sm:text-sm text-[#77716D] leading-relaxed">
-                  Copy to clipboard with one click, download SRT/TXT/PDF files, or save to your personal library to read distraction-free.
+                  Copy to clipboard with one click, download SRT/TXT/JSON files directly, or save to your personal library to read distraction-free and export formatted PDFs.
                 </p>
               </div>
             </div>
@@ -1536,7 +1540,7 @@ function HomePageContent() {
               </div>
               <h3 className="font-bold text-base text-[#292522] mb-2">Privacy & Ephemeral Utility</h3>
               <p className="text-xs sm:text-sm text-[#77716D] leading-relaxed">
-                Guest extraction is processed strictly in-memory and discarded. Saved books in member accounts are private and never shared.
+                Guest transcripts are never stored in our database, only briefly cached in server memory. Saved books in member accounts are private to you.
               </p>
             </div>
           </div>
@@ -1552,7 +1556,7 @@ function HomePageContent() {
               Caption Availability & Transparency
             </h3>
             <p className="text-xs sm:text-sm text-[#77716D] leading-relaxed">
-              Transcriptly extracts publicly available creator-uploaded subtitle tracks and YouTube auto-generated captions. If an uploader disables subtitles or the video is restricted, Transcriptly will inform you clearly. For videos without captions, you can enable our optional local speech recognition fallback in Options.
+              Transcriptly extracts publicly available creator-uploaded subtitle tracks and YouTube auto-generated captions. If an uploader disables subtitles or the video is restricted, Transcriptly will inform you clearly. For videos without captions, you can try the optional speech-to-text fallback, which transcribes the audio on our server (shorter videos only), or import captions with the Chrome extension if YouTube blocks the request.
             </p>
             <div className="pt-2">
               <Link
@@ -1565,74 +1569,94 @@ function HomePageContent() {
           </div>
         </section>
 
-        {/* Learning Guides Callout */}
-        <section className="rounded-3xl border border-[#F0E8E2] bg-white p-6 sm:p-10 shadow-xs">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-[#F0E8E2]">
+        {/* Who Transcriptly helps — real workflows, each linked to an in-depth guide */}
+        <section aria-labelledby="who-it-helps" className="space-y-6">
+          <div className="max-w-2xl">
+            <h2 id="who-it-helps" className="text-2xl sm:text-3xl font-bold tracking-tight text-[#292522]">
+              Learn more from the videos you already watch
+            </h2>
+            <p className="mt-2 text-sm text-[#77716D] leading-relaxed">
+              Video is a great way to be taught and a slow way to revise, search or quote. Transcriptly turns a YouTube link into text you can read, keep and work with. Here is how people use it.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {[
+              {
+                title: "Students revising recorded lectures",
+                body: "Preview a lecture in two minutes, review it in text instead of rewatching, and turn it into notes and self-test questions with timestamps that lead back to the explanation.",
+                href: "/guides/how-to-turn-youtube-lectures-into-study-notes",
+                link: "Turn lectures into study notes",
+              },
+              {
+                title: "Language learners using real video",
+                body: "Read what you just heard, check difficult passages in a side-by-side translation, and save English words with Bangla meanings to a personal word list you review as flashcards.",
+                href: "/guides/how-to-learn-english-using-youtube-transcripts",
+                link: "Learn English with transcripts",
+              },
+              {
+                title: "Researchers and writers quoting video",
+                body: "Screen many talks by searching their text, capture quotes with timestamps, and export JSON that records the language and whether captions were auto-generated.",
+                href: "/guides/how-to-research-efficiently-with-video-transcripts",
+                link: "Research with video transcripts",
+              },
+              {
+                title: "Readers who prefer text to video",
+                body: "Save long talks as books you can read on your phone in light, sepia or dark mode, pick up where you left off, and export a PDF that renders Bangla correctly.",
+                href: "/guides/how-to-build-a-personal-digital-library-from-video",
+                link: "Build a personal library",
+              },
+            ].map((item) => (
+              <div key={item.title} className="rounded-2xl border border-[#F0E8E2] bg-white p-6 shadow-xs">
+                <h3 className="font-bold text-base text-[#292522] mb-2">{item.title}</h3>
+                <p className="text-sm text-[#77716D] leading-relaxed">{item.body}</p>
+                <Link href={item.href} className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[#292522] underline decoration-[#E9A9C3] decoration-2 underline-offset-4">
+                  {item.link} <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Knowledge base: every category with its guides (links rendered server-side) */}
+        <section aria-labelledby="knowledge-base" className="rounded-3xl border border-[#F0E8E2] bg-white p-6 sm:p-10 shadow-xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 mb-8 pb-6 border-b border-[#F0E8E2]">
             <div>
-              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#292522]">
-                Guides & Tutorials
+              <h2 id="knowledge-base" className="text-xl sm:text-2xl font-bold tracking-tight text-[#292522]">
+                Explore the Transcriptly knowledge base
               </h2>
-              <p className="mt-1 text-xs sm:text-sm text-[#77716D]">
-                Learn how to get the most out of video transcripts for studying, research, and note-taking.
+              <p className="mt-1 text-xs sm:text-sm text-[#77716D] max-w-xl">
+                {GUIDES.length} practical guides on transcripts, study workflows, language learning and how captions and speech recognition work.
               </p>
             </div>
             <Link
               href="/guides"
               className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#292522] hover:text-[#E9A9C3]"
             >
-              <span>View All 5 Guides</span>
+              <span>View all {GUIDES.length} guides</span>
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Link
-              href="/guides/how-to-get-transcript-from-youtube"
-              className="rounded-2xl border border-[#F0E8E2] bg-[#FFFDF8] p-4 sm:p-5 hover:border-[#E9A9C3] transition-colors group"
-            >
-              <h3 className="font-bold text-sm sm:text-base text-[#292522] group-hover:text-[#292522] mb-1">
-                How to Get a Transcript from a YouTube Video →
-              </h3>
-              <p className="text-xs text-[#77716D]">
-                Step-by-step walkthrough using built-in YouTube player controls and Transcriptly.
-              </p>
-            </Link>
-
-            <Link
-              href="/guides/how-to-copy-and-save-youtube-captions"
-              className="rounded-2xl border border-[#F0E8E2] bg-[#FFFDF8] p-4 sm:p-5 hover:border-[#E9A9C3] transition-colors group"
-            >
-              <h3 className="font-bold text-sm sm:text-base text-[#292522] group-hover:text-[#292522] mb-1">
-                How to Copy, Format, and Save YouTube Captions →
-              </h3>
-              <p className="text-xs text-[#77716D]">
-                Format messy captions into clean paragraphs and export TXT, SRT, and PDF files.
-              </p>
-            </Link>
-
-            <Link
-              href="/guides/how-to-use-transcripts-for-studying-research"
-              className="rounded-2xl border border-[#F0E8E2] bg-[#FFFDF8] p-4 sm:p-5 hover:border-[#E9A9C3] transition-colors group"
-            >
-              <h3 className="font-bold text-sm sm:text-base text-[#292522] group-hover:text-[#292522] mb-1">
-                How to Use Transcripts for Studying and Research →
-              </h3>
-              <p className="text-xs text-[#77716D]">
-                Proven strategies to speed up comprehension, cite lectures, and build study books.
-              </p>
-            </Link>
-
-            <Link
-              href="/guides/understanding-transcript-languages-and-timestamps"
-              className="rounded-2xl border border-[#F0E8E2] bg-[#FFFDF8] p-4 sm:p-5 hover:border-[#E9A9C3] transition-colors group"
-            >
-              <h3 className="font-bold text-sm sm:text-base text-[#292522] group-hover:text-[#292522] mb-1">
-                Understanding Transcript Languages & SRT Files →
-              </h3>
-              <p className="text-xs text-[#77716D]">
-                How automated caption tracks differ from creator tracks and how SRT timecodes operate.
-              </p>
-            </Link>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {GUIDE_CATEGORIES.map((cat) => (
+              <div key={cat.slug}>
+                <Link href={`/guides/${cat.slug}`} className="font-bold text-sm sm:text-base text-[#292522] hover:underline">
+                  {cat.name}
+                </Link>
+                <p className="mt-1 text-xs text-[#77716D] leading-relaxed">{cat.description}</p>
+                <ul className="mt-3 space-y-2">
+                  {GUIDES.filter((g) => g.category === cat.slug)
+                    .slice(0, 4)
+                    .map((g) => (
+                      <li key={g.slug}>
+                        <Link href={`/guides/${g.slug}`} className="text-sm text-[#292522] hover:text-[#77716D] leading-snug">
+                          {g.title}
+                        </Link>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -1656,7 +1680,7 @@ function HomePageContent() {
                 </span>
               </summary>
               <p className="mt-3 text-xs sm:text-sm text-[#77716D] leading-relaxed border-t border-[#F0E8E2]/60 pt-3">
-                Copy the link of any public YouTube video, paste it into the URL box at the top of the page, and click &ldquo;Extract Transcript&rdquo;. Transcriptly fetches available caption tracks and assembles them into clean reading paragraphs within seconds.
+                Copy the link of any public YouTube video, paste it into the URL box at the top of the page, and click &ldquo;Get Transcript&rdquo;. Transcriptly fetches available caption tracks and assembles them into clean reading paragraphs within seconds.
               </p>
             </details>
 
@@ -1934,7 +1958,7 @@ function HomePageContent() {
               </div>
 
               <div className="rounded-xl bg-[#FFF1B8]/40 border border-[#F0E8E2] p-3 text-[11px] text-[#433422] leading-relaxed">
-                💡 <strong>Privacy notice:</strong> Please only upload or paste subtitle files you have permission to use. Your transcript is parsed locally and staged privately for your reading session.
+                💡 <strong>Privacy notice:</strong> Please only upload or paste subtitle files you have permission to use. Your subtitle text is parsed and staged privately on our server for up to 5 minutes using a single-use import token.
               </div>
 
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#F0E8E2]">

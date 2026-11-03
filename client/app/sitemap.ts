@@ -1,32 +1,60 @@
 import type { MetadataRoute } from "next";
+import { CATEGORIES, GUIDES, guidesInCategory, lastModified } from "@/lib/guides/registry";
+
+/**
+ * Public, indexable pages only. Authenticated or private routes
+ * (/dashboard, /dictionary, /books, /import, /admin, /login, /signup,
+ * /reset-password) are intentionally excluded.
+ *
+ * lastModified values are real content dates (not the build time), so
+ * search engines aren't told every page changed on every deploy.
+ * Update STATIC_PAGES dates when those pages' content changes.
+ */
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://habd.tech";
+
+type Freq = MetadataRoute.Sitemap[number]["changeFrequency"];
+
+const STATIC_PAGES: { path: string; modified: string; priority: number; changeFrequency: Freq }[] = [
+  { path: "", modified: "2026-11-02", priority: 1.0, changeFrequency: "weekly" },
+  { path: "/guides", modified: "2026-11-02", priority: 0.9, changeFrequency: "weekly" },
+  { path: "/extension", modified: "2026-10-17", priority: 0.8, changeFrequency: "monthly" },
+  { path: "/how-it-works", modified: "2026-10-16", priority: 0.7, changeFrequency: "monthly" },
+  { path: "/faq", modified: "2026-10-19", priority: 0.6, changeFrequency: "monthly" },
+  { path: "/about", modified: "2026-10-16", priority: 0.5, changeFrequency: "yearly" },
+  { path: "/contact", modified: "2026-11-02", priority: 0.5, changeFrequency: "yearly" },
+  { path: "/privacy", modified: "2026-11-02", priority: 0.3, changeFrequency: "yearly" },
+  { path: "/terms", modified: "2026-10-16", priority: 0.3, changeFrequency: "yearly" },
+  { path: "/copyright", modified: "2026-11-02", priority: 0.3, changeFrequency: "yearly" },
+];
+
+const asDate = (iso: string) => new Date(`${iso}T00:00:00Z`);
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://habd.tech";
-  const now = new Date();
-
-  const routes: { path: string; priority: number; changeFrequency: "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never" }[] = [
-    { path: "", priority: 1.0, changeFrequency: "daily" },
-    { path: "/extension", priority: 0.9, changeFrequency: "weekly" },
-    { path: "/how-it-works", priority: 0.8, changeFrequency: "weekly" },
-    { path: "/guides", priority: 0.8, changeFrequency: "weekly" },
-    { path: "/guides/how-to-use-chrome-extension", priority: 0.8, changeFrequency: "weekly" },
-    { path: "/guides/how-to-get-transcript-from-youtube", priority: 0.7, changeFrequency: "monthly" },
-    { path: "/guides/how-to-copy-and-save-youtube-captions", priority: 0.7, changeFrequency: "monthly" },
-    { path: "/guides/how-to-fix-missing-unavailable-captions", priority: 0.7, changeFrequency: "monthly" },
-    { path: "/guides/how-to-use-transcripts-for-studying-research", priority: 0.7, changeFrequency: "monthly" },
-    { path: "/guides/understanding-transcript-languages-and-timestamps", priority: 0.7, changeFrequency: "monthly" },
-    { path: "/faq", priority: 0.7, changeFrequency: "weekly" },
-    { path: "/about", priority: 0.6, changeFrequency: "monthly" },
-    { path: "/contact", priority: 0.6, changeFrequency: "monthly" },
-    { path: "/privacy", priority: 0.5, changeFrequency: "yearly" },
-    { path: "/terms", priority: 0.5, changeFrequency: "yearly" },
-    { path: "/copyright", priority: 0.5, changeFrequency: "yearly" },
-  ];
-
-  return routes.map((route) => ({
-    url: `${siteUrl}${route.path}`,
-    lastModified: now,
-    changeFrequency: route.changeFrequency,
-    priority: route.priority,
+  const pages: MetadataRoute.Sitemap = STATIC_PAGES.map((p) => ({
+    url: `${SITE_URL}${p.path}`,
+    lastModified: asDate(p.modified),
+    changeFrequency: p.changeFrequency,
+    priority: p.priority,
   }));
+
+  const categories: MetadataRoute.Sitemap = CATEGORIES.map((c) => ({
+    url: `${SITE_URL}/guides/${c.slug}`,
+    lastModified: asDate(
+      guidesInCategory(c.slug)
+        .map(lastModified)
+        .sort()
+        .at(-1)!
+    ),
+    changeFrequency: "weekly",
+    priority: 0.7,
+  }));
+
+  const guides: MetadataRoute.Sitemap = GUIDES.map((g) => ({
+    url: `${SITE_URL}/guides/${g.slug}`,
+    lastModified: asDate(lastModified(g)),
+    changeFrequency: "monthly",
+    priority: g.featured ? 0.8 : 0.7,
+  }));
+
+  return [...pages, ...categories, ...guides];
 }

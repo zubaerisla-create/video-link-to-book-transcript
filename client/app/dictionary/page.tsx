@@ -10,18 +10,14 @@ import {
   Volume2,
   Trash2,
   Edit3,
-  ExternalLink,
   BookOpen,
   Sparkles,
   RotateCcw,
   AlertCircle,
-  CheckCircle2,
-  Clock,
   ChevronLeft,
   ChevronRight,
   X,
   Loader2,
-  Filter,
   Plus,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -34,7 +30,6 @@ import {
 import {
   SavedWord,
   LearningStatus,
-  SavedWordListResponse,
 } from "@/lib/types";
 import { VocabularyReviewModal } from "@/components/dictionary/VocabularyReviewModal";
 
@@ -43,7 +38,6 @@ export default function DictionaryPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   const [words, setWords] = useState<SavedWord[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
   const [statusCounts, setStatusCounts] = useState({
@@ -95,10 +89,9 @@ export default function DictionaryPage() {
         page_size: 15,
       });
       setWords(res.items);
-      setTotalCount(res.total);
       setTotalPages(res.total_pages);
       setStatusCounts(res.counts);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof ApiError) {
         setError(err.message);
       } else {
@@ -110,8 +103,35 @@ export default function DictionaryPage() {
   }, [isAuthenticated, searchQuery, statusFilter, sortOption, currentPage]);
 
   useEffect(() => {
-    loadWords();
-  }, [loadWords]);
+    if (!isAuthenticated) return;
+    let active = true;
+    listSavedWordsApi({
+      search: searchQuery,
+      status: statusFilter,
+      sort: sortOption,
+      page: currentPage,
+      page_size: 15,
+    })
+      .then((res) => {
+        if (active) {
+          setWords(res.items);
+          setTotalPages(res.total_pages);
+          setStatusCounts(res.counts);
+          setError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (active) {
+          setError(err instanceof ApiError ? err.message : "Failed to load your personal dictionary.");
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated, searchQuery, statusFilter, sortOption, currentPage]);
 
   // Search debounce
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -306,7 +326,7 @@ export default function DictionaryPage() {
       </div>
 
       {/* Main Content Area */}
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Controls Bar: Search & Sort */}
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {/* Search Box */}
@@ -580,7 +600,7 @@ export default function DictionaryPage() {
             </button>
           </div>
         )}
-      </main>
+      </div>
 
       {/* Review Flashcards Modal */}
       <VocabularyReviewModal

@@ -7,20 +7,15 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
-  BookOpen,
   Bookmark,
   Search,
-  Sliders,
-  Type,
   Sun,
   Moon,
   Coffee,
   Download,
   FileDown,
-  ListFilter,
   Scroll,
   ExternalLink,
-  RotateCcw,
   AlertCircle,
   FileText,
   X,
@@ -28,6 +23,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import {
   getBookApi,
+  updateBookApi,
   updateProgressApi,
   startReadingSessionApi,
   heartbeatReadingSessionApi,
@@ -99,12 +95,50 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Reader Preferences
-  const [theme, setTheme] = useState<ReaderTheme>("light");
-  const [fontSize, setFontSize] = useState<FontSize>("md");
+  const [theme, setTheme] = useState<ReaderTheme>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("transcriptly_reader_theme");
+      if (saved === "light" || saved === "sepia" || saved === "dark") return saved;
+    }
+    return "light";
+  });
+  const [fontSize, setFontSize] = useState<FontSize>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("transcriptly_reader_font_size");
+      if (saved === "sm" || saved === "md" || saved === "lg" || saved === "xl") return saved;
+    }
+    return "md";
+  });
   const [isContinuous, setIsContinuous] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [showExportMenu, setShowExportMenu] = useState(false);
+
+  const handleThemeChange = useCallback(
+    (newTheme: ReaderTheme) => {
+      setTheme(newTheme);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("transcriptly_reader_theme", newTheme);
+      }
+      if (book) {
+        updateBookApi(book.id, { reading_theme: newTheme }).catch(() => {});
+      }
+    },
+    [book]
+  );
+
+  const handleFontSizeChange = useCallback(
+    (newSize: FontSize) => {
+      setFontSize(newSize);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("transcriptly_reader_font_size", newSize);
+      }
+      if (book) {
+        updateBookApi(book.id, { font_size: newSize }).catch(() => {});
+      }
+    },
+    [book]
+  );
 
   // Word Selection & Translation Popup State
   const readerContentRef = useRef<HTMLDivElement>(null);
@@ -264,23 +298,26 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
   const totalPages = pages.length || 1;
 
   // Sync Reading Progress to Backend
-  const saveReadingProgress = async (page: number) => {
-    if (!book) return;
-    const progress = Math.min(100, Math.round((page / totalPages) * 100));
-    try {
-      await updateProgressApi(book.id, {
-        last_page_read: page,
-        reading_progress: progress,
-      });
-    } catch {
-      // Non-critical background sync
-    }
-  };
+  const saveReadingProgress = useCallback(
+    async (page: number) => {
+      if (!book) return;
+      const progress = Math.min(100, Math.round((page / totalPages) * 100));
+      try {
+        await updateProgressApi(book.id, {
+          last_page_read: page,
+          reading_progress: progress,
+        });
+      } catch {
+        // Non-critical background sync
+      }
+    },
+    [book, totalPages]
+  );
 
   // Active Reading Time Tracking Instrumentation
   const readingSessionIdRef = useRef<string | null>(null);
   const accumulatedSecondsRef = useRef<number>(0);
-  const lastActiveTimeRef = useRef<number>(Date.now());
+  const lastActiveTimeRef = useRef<number>(0);
   const isTabVisibleRef = useRef<boolean>(true);
   const currentPageRef = useRef<number>(currentPage);
   const totalPagesRef = useRef<number>(totalPages);
@@ -293,11 +330,13 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
     totalPagesRef.current = totalPages;
   }, [totalPages]);
 
+  const activeBookId = book?.id ?? null;
+
   useEffect(() => {
-    if (!book || !isAuthenticated) return;
+    if (!activeBookId || !isAuthenticated) return;
 
     // Start a new reading session
-    const uniqueSessionId = `read-${book.id}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const uniqueSessionId = `read-${activeBookId}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     readingSessionIdRef.current = uniqueSessionId;
     accumulatedSecondsRef.current = 0;
     lastActiveTimeRef.current = Date.now();
@@ -317,7 +356,7 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
       Math.round((currentPageRef.current / (totalPagesRef.current || 1)) * 100)
     );
 
-    startReadingSessionApi(book.id, {
+    startReadingSessionApi(activeBookId, {
       session_id: uniqueSessionId,
       last_page_read: currentPageRef.current,
       reading_progress: initialProgress,
@@ -345,7 +384,7 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
         const totP = totalPagesRef.current || 1;
         const prog = Math.min(100, Math.round((curP / totP) * 100));
 
-        heartbeatReadingSessionApi(book.id, {
+        heartbeatReadingSessionApi(activeBookId, {
           session_id: uniqueSessionId,
           active_seconds: toFlush,
           last_page_read: curP,
@@ -375,7 +414,7 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
       const prog = Math.min(100, Math.round((curP / totP) * 100));
 
       endReadingSessionApi(
-        book.id,
+        activeBookId,
         {
           session_id: readingSessionIdRef.current,
           final_active_seconds: remainingSeconds,
@@ -410,9 +449,9 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
       window.removeEventListener("beforeunload", flushRemainingSession);
       flushRemainingSession();
     };
-  }, [book?.id, isAuthenticated]);
+  }, [activeBookId, isAuthenticated]);
 
-  const handlePrevPage = () => {
+  const handlePrevPage = useCallback(() => {
     if (currentPage > 1) {
       handleClosePopup();
       const prev = currentPage - 1;
@@ -420,9 +459,9 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
       saveReadingProgress(prev);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
-  };
+  }, [currentPage, handleClosePopup, saveReadingProgress]);
 
-  const handleNextPage = () => {
+  const handleNextPage = useCallback(() => {
     if (currentPage < totalPages) {
       handleClosePopup();
       const next = currentPage + 1;
@@ -430,7 +469,7 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
       saveReadingProgress(next);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
-  };
+  }, [currentPage, totalPages, handleClosePopup, saveReadingProgress]);
 
   // Keyboard Navigation (Left / Right Arrow Keys)
   useEffect(() => {
@@ -447,7 +486,7 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentPage, totalPages, isContinuous]);
+  }, [isContinuous, handlePrevPage, handleNextPage]);
 
   // Detect RTL languages
   const isRtl = useMemo(() => {
@@ -535,7 +574,7 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
   return (
     <div className={`min-h-screen ${themeStyles.pageBg} transition-colors duration-200 pb-20`}>
       {/* Top Reader Sticky Toolbar */}
-      <header className={`sticky top-0 z-30 border-b ${themeStyles.border} ${themeStyles.cardBg}/95 backdrop-blur-md transition-colors`}>
+      <header className={`sticky top-16 z-30 border-b ${themeStyles.border} ${themeStyles.cardBg}/95 backdrop-blur-md transition-colors`}>
         <div className="mx-auto max-w-4xl px-3 py-2 sm:px-6 sm:py-2.5">
           {/* Main Top Row */}
           <div className="flex items-center justify-between gap-2 sm:gap-4">
@@ -611,7 +650,7 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
                 {(["sm", "md", "lg", "xl"] as FontSize[]).map((size) => (
                   <button
                     key={size}
-                    onClick={() => setFontSize(size)}
+                    onClick={() => handleFontSizeChange(size)}
                     className={`rounded-lg px-2 py-1 text-xs font-medium uppercase transition-colors ${
                       fontSize === size ? themeStyles.activePill : themeStyles.mutedText
                     }`}
@@ -625,7 +664,7 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
               <div className={`hidden sm:flex items-center rounded-xl border ${themeStyles.border} ${themeStyles.pageBg} p-0.5`}>
                 <button
                   type="button"
-                  onClick={() => setTheme("light")}
+                  onClick={() => handleThemeChange("light")}
                   title="Light Theme"
                   className={`rounded-lg p-1.5 transition-colors ${theme === "light" ? themeStyles.activePill : themeStyles.mutedText}`}
                 >
@@ -633,7 +672,7 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setTheme("sepia")}
+                  onClick={() => handleThemeChange("sepia")}
                   title="Sepia Theme"
                   className={`rounded-lg p-1.5 transition-colors ${theme === "sepia" ? themeStyles.activePill : themeStyles.mutedText}`}
                 >
@@ -641,7 +680,7 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setTheme("dark")}
+                  onClick={() => handleThemeChange("dark")}
                   title="Dark Theme"
                   className={`rounded-lg p-1.5 transition-colors ${theme === "dark" ? themeStyles.activePill : themeStyles.mutedText}`}
                 >
@@ -715,7 +754,7 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
                 {(["sm", "md", "lg", "xl"] as FontSize[]).map((size) => (
                   <button
                     key={size}
-                    onClick={() => setFontSize(size)}
+                    onClick={() => handleFontSizeChange(size)}
                     className={`rounded-lg px-2.5 py-1 text-xs font-medium uppercase transition-colors ${
                       fontSize === size ? themeStyles.activePill : themeStyles.mutedText
                     }`}
@@ -734,7 +773,7 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
               <div className={`flex items-center rounded-xl border ${themeStyles.border} ${themeStyles.pageBg} p-0.5`}>
                 <button
                   type="button"
-                  onClick={() => setTheme("light")}
+                  onClick={() => handleThemeChange("light")}
                   title="Light Theme"
                   className={`rounded-lg p-1.5 transition-colors ${theme === "light" ? themeStyles.activePill : themeStyles.mutedText}`}
                 >
@@ -742,7 +781,7 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setTheme("sepia")}
+                  onClick={() => handleThemeChange("sepia")}
                   title="Sepia Theme"
                   className={`rounded-lg p-1.5 transition-colors ${theme === "sepia" ? themeStyles.activePill : themeStyles.mutedText}`}
                 >
@@ -750,7 +789,7 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setTheme("dark")}
+                  onClick={() => handleThemeChange("dark")}
                   title="Dark Theme"
                   className={`rounded-lg p-1.5 transition-colors ${theme === "dark" ? themeStyles.activePill : themeStyles.mutedText}`}
                 >
@@ -763,7 +802,7 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
       </header>
 
       {/* Main Book Reader Area */}
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         {/* Book Jacket / Title Card on Page 1 */}
         {currentPage === 1 && !isContinuous && (
           <div className="mb-8 pb-6 border-b border-[#F0E8E2]/60 text-center">
@@ -880,7 +919,7 @@ export default function BookReaderPage({ params }: ReaderPageProps) {
             onClose={handleClosePopup}
           />
         )}
-      </main>
+      </div>
     </div>
   );
 }

@@ -45,6 +45,7 @@ def clear_auth_cookie(response: Response):
         key=settings.COOKIE_NAME,
         path="/",
         httponly=True,
+        secure=settings.COOKIE_SECURE,
         samesite="lax",
     )
 
@@ -173,11 +174,15 @@ def get_me(current_user: User = Depends(get_current_user)):
 
 def send_reset_email(to_email: str, reset_link: str, full_name: str):
     """Sends a password recovery email via SMTP using Gmail app credentials."""
+    import html
     import smtplib
     from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
 
     try:
+        safe_full_name = html.escape(full_name or "")
+        safe_reset_link = html.escape(reset_link or "", quote=True)
+
         msg = MIMEMultipart("alternative")
         msg["Subject"] = "Reset Your Transcriptly Password"
         msg["From"] = f"Transcriptly <{settings.SMTP_FROM_EMAIL}>"
@@ -196,12 +201,12 @@ def send_reset_email(to_email: str, reset_link: str, full_name: str):
             <div style="text-align: center; margin-bottom: 20px;">
                 <h2 style="color: #292522; margin: 0; font-size: 20px; font-weight: bold;">Reset Your Password</h2>
             </div>
-            <p style="color: #44403C; font-size: 14px; line-height: 1.5;">Hello {full_name},</p>
+            <p style="color: #44403C; font-size: 14px; line-height: 1.5;">Hello {safe_full_name},</p>
             <p style="color: #77716D; font-size: 14px; line-height: 1.5;">We received a request to reset the password for your Transcriptly account. Click the button below to choose a new password:</p>
             <div style="margin: 28px 0; text-align: center;">
-                <a href="{reset_link}" style="background-color: #292522; color: #ffffff; padding: 12px 28px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block;">Reset Password</a>
+                <a href="{safe_reset_link}" style="background-color: #292522; color: #ffffff; padding: 12px 28px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block;">Reset Password</a>
             </div>
-            <p style="color: #77716D; font-size: 12px; line-height: 1.5;">Or copy and paste this link into your browser:<br/><a href="{reset_link}" style="color: #292522; word-break: break-all;">{reset_link}</a></p>
+            <p style="color: #77716D; font-size: 12px; line-height: 1.5;">Or copy and paste this link into your browser:<br/><a href="{safe_reset_link}" style="color: #292522; word-break: break-all;">{safe_reset_link}</a></p>
             <div style="margin-top: 24px; pt: 16px; border-top: 1px solid #F0E8E2; font-size: 11px; color: #A8A29E; text-align: center;">
                 This link expires in 15 minutes. If you didn't request a password reset, you can safely ignore this email.
             </div>
@@ -259,11 +264,11 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
         )
 
     user_id = decoded["sub"]
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"detail": "User account not found.", "code": "USER_NOT_FOUND"},
+            detail={"detail": "User account not found or disabled.", "code": "USER_NOT_FOUND"},
         )
 
     # Replay prevention: verify the current password hash matches the token fingerprint

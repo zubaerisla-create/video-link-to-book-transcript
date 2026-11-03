@@ -1,151 +1,173 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BookOpen, FileText, Copy, AlertCircle, GraduationCap, Clock, ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { AdBanner } from "@/components/AdBanner";
 import { ADSENSE_SLOTS } from "@/lib/adsense";
+import { CATEGORIES, CATEGORY_BY_SLUG, lastModified } from "@/lib/guides/registry";
+import { loadAllGuides } from "@/lib/guides/content";
+import { GuidesExplorer } from "@/components/guides/GuidesExplorer";
+import { Breadcrumbs, GuideCard, JsonLd, SITE_URL, breadcrumbSchema } from "@/components/guides/GuideParts";
 
 export const metadata: Metadata = {
-  title: "YouTube Transcript Guides & Tutorials",
+  title: "Transcriptly Guides: Transcripts, Study Workflows & Language Learning",
   description:
-    "Explore practical guides on extracting YouTube transcripts, fixing missing subtitles, converting captions to study notes, and understanding video timestamps.",
-  alternates: {
-    canonical: "/guides",
+    "The Transcriptly knowledge base: practical guides on extracting YouTube transcripts, export formats, turning lectures into study notes, learning languages with video, and how speech recognition works.",
+  alternates: { canonical: "/guides" },
+  openGraph: {
+    type: "website",
+    url: "/guides",
+    title: "Transcriptly Guides & Knowledge Base",
+    description:
+      "Practical guides on video transcripts, study workflows, language learning and transcription technology.",
+  },
+  twitter: {
+    card: "summary",
+    title: "Transcriptly Guides & Knowledge Base",
+    description:
+      "Practical guides on video transcripts, study workflows, language learning and transcription technology.",
   },
 };
 
-const GUIDES = [
-  {
-    slug: "how-to-use-chrome-extension",
-    title: "How to Install and Use Transcriptly Chrome Extension (Step-by-Step)",
-    description:
-      "A complete beginner-friendly visual guide with illustrations on installing the free Chrome extension and capturing transcripts in 1 click directly from YouTube.",
-    readTime: "3 min read",
-    icon: Sparkles,
-    category: "Featured",
-  },
-  {
-    slug: "how-to-get-transcript-from-youtube",
-    title: "How to Get a Transcript from a YouTube Video",
-    description:
-      "A complete walkthrough of extracting captions from any public YouTube video using both YouTube's built-in player and Transcriptly's paragraph generator.",
-    readTime: "4 min read",
-    icon: FileText,
-    category: "Tutorial",
-  },
-  {
-    slug: "how-to-copy-and-save-youtube-captions",
-    title: "How to Copy, Format, and Save YouTube Captions",
-    description:
-      "Learn how to extract caption text without messy timestamps, download standard SRT and TXT files, and save transcripts into a digital book reader.",
-    readTime: "5 min read",
-    icon: Copy,
-    category: "Productivity",
-  },
-  {
-    slug: "how-to-fix-missing-unavailable-captions",
-    title: "How to Fix Missing or Unavailable YouTube Captions",
-    description:
-      "Troubleshoot why a video shows 'Could not retrieve transcript', understand creator caption settings, and see how local speech recognition fallback operates.",
-    readTime: "5 min read",
-    icon: AlertCircle,
-    category: "Troubleshooting",
-  },
-  {
-    slug: "how-to-use-transcripts-for-studying-research",
-    title: "How to Use Video Transcripts for Studying and Research",
-    description:
-      "Proven strategies for students, researchers, and content creators to turn long video lectures into searchable study notes, quotes, and reading books.",
-    readTime: "6 min read",
-    icon: GraduationCap,
-    category: "Learning",
-  },
-  {
-    slug: "understanding-transcript-languages-and-timestamps",
-    title: "Understanding Transcript Languages, Timestamps, and SRT Files",
-    description:
-      "Explore how YouTube auto-captions differ from manual tracks, how millisecond timecodes work in SRT files, and how multilingual subtitles are handled.",
-    readTime: "5 min read",
-    icon: Clock,
-    category: "Technical",
-  },
+const CRUMBS = [
+  { name: "Home", href: "/" },
+  { name: "Guides", href: "/guides" },
 ];
 
 export default function GuidesHubPage() {
+  const guides = loadAllGuides();
+  const featured = guides.filter((g) => g.featured).slice(0, 6);
+  const recent = [...guides]
+    .sort((a, b) => lastModified(b).localeCompare(lastModified(a)))
+    .slice(0, 5);
+
+  const collectionSchema = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "Transcriptly Guides",
+    url: `${SITE_URL}/guides`,
+    hasPart: guides.map((g) => ({ "@type": "Article", headline: g.title, url: `${SITE_URL}/guides/${g.slug}` })),
+  };
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8 sm:py-16">
-      {/* Header */}
-      <div className="text-center mb-12 sm:mb-16">
-        <div className="inline-flex items-center rounded-full bg-[#FFF1B8] px-3.5 py-1 text-xs font-semibold tracking-wider text-[#292522] uppercase mb-4 border border-[#F0E8E2]">
-          <span>Learning Center</span>
+    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+      <JsonLd data={breadcrumbSchema(CRUMBS)} />
+      <JsonLd data={collectionSchema} />
+      <Breadcrumbs items={CRUMBS} />
+
+      {/* Intro */}
+      <header className="mb-10 grid gap-8 lg:grid-cols-[1.4fr_1fr] lg:items-end">
+        <div>
+          <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-[#77716D]">Transcriptly knowledge base</p>
+          <h1 className="text-3xl font-bold tracking-tight text-[#292522] sm:text-[2.6rem] sm:leading-[1.15]">
+            Learn more from every video you watch
+          </h1>
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#5f5955] sm:text-lg">
+            {guides.length} practical guides on getting transcripts out of YouTube, turning them into notes and readable
+            books, learning languages with real video, and understanding how captions and speech recognition actually work.
+          </p>
         </div>
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#292522]">
-          YouTube Transcript Guides & Tutorials
-        </h1>
-        <p className="mt-4 text-base sm:text-lg text-[#77716D] max-w-2xl mx-auto leading-relaxed">
-          Practical, straightforward advice on extracting video captions, formatting speech into readable paragraphs, and turning lectures into personal digital books.
-        </p>
-      </div>
+        <div className="rounded-3xl border border-[#F0E8E2] bg-[#FFFDF8] p-5 text-sm leading-relaxed text-[#5f5955]">
+          <p className="font-semibold text-[#292522]">How these guides are written</p>
+          <p className="mt-1.5">
+            Each guide describes what Transcriptly actually does today and says plainly where it falls short. When a
+            guide compares tools, it explains the method rather than quoting numbers we haven&apos;t measured.
+          </p>
+        </div>
+      </header>
 
-      {/* Guides Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {GUIDES.map((guide) => {
-          const Icon = guide.icon;
-          return (
-            <Link
-              key={guide.slug}
-              href={`/guides/${guide.slug}`}
-              className="group flex flex-col justify-between rounded-3xl border border-[#F0E8E2] bg-white p-6 sm:p-8 shadow-xs hover:border-[#E9A9C3] hover:shadow-md transition-all"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFF1B8] border border-[#F0E8E2] text-[#292522] group-hover:bg-[#F8DDE8] transition-colors">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-[#77716D] bg-[#FFFDF8] border border-[#F0E8E2] px-2.5 py-0.5 rounded-full">
-                      {guide.category}
-                    </span>
-                    <span className="text-xs text-[#77716D]">{guide.readTime}</span>
-                  </div>
-                </div>
+      <GuidesExplorer
+        guides={guides.map((g) => ({
+          slug: g.slug,
+          title: g.title,
+          description: g.description,
+          category: g.category,
+          categoryName: CATEGORY_BY_SLUG.get(g.category)!.name,
+          readingMinutes: g.readingMinutes,
+        }))}
+        categories={CATEGORIES.map((c) => ({ slug: c.slug, name: c.shortName }))}
+      />
 
-                <h2 className="text-lg sm:text-xl font-bold text-[#292522] group-hover:text-[#292522] transition-colors mb-2 leading-snug">
-                  {guide.title}
-                </h2>
-                <p className="text-xs sm:text-sm text-[#77716D] leading-relaxed mb-6">
-                  {guide.description}
-                </p>
-              </div>
+      {/* Category navigation */}
+      <nav aria-label="Guide categories" className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {CATEGORIES.map((c) => (
+          <Link
+            key={c.slug}
+            href={`/guides/${c.slug}`}
+            className="group rounded-3xl border border-[#F0E8E2] bg-white p-5 transition-colors hover:border-[#E9A9C3]"
+          >
+            <span className="block text-sm font-bold text-[#292522]">{c.name}</span>
+            <span className="mt-1.5 block text-xs leading-relaxed text-[#77716D]">{c.description}</span>
+            <span className="mt-3 flex items-center gap-1 text-xs font-semibold text-[#292522]">
+              {guides.filter((g) => g.category === c.slug).length} guides
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            </span>
+          </Link>
+        ))}
+      </nav>
 
-              <div className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#292522] group-hover:translate-x-1 transition-transform pt-4 border-t border-[#F0E8E2]/60">
-                <span>Read Full Guide</span>
-                <ArrowRight className="h-4 w-4" />
-              </div>
+      {/* Featured */}
+      <section aria-labelledby="featured" className="mt-14">
+        <h2 id="featured" className="mb-5 text-xl font-bold text-[#292522] sm:text-2xl">Start with these</h2>
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {featured.map((g) => (
+            <GuideCard key={g.slug} guide={g} />
+          ))}
+        </div>
+      </section>
+
+      {/* Recent */}
+      <section aria-labelledby="recent" className="mt-14 rounded-3xl border border-[#F0E8E2] bg-white p-6 sm:p-8">
+        <h2 id="recent" className="mb-4 text-xl font-bold text-[#292522]">Recently published and updated</h2>
+        <ul className="divide-y divide-[#F0E8E2]">
+          {recent.map((g) => (
+            <li key={g.slug} className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <Link href={`/guides/${g.slug}`} className="text-sm font-semibold text-[#292522] hover:underline">
+                {g.title}
+              </Link>
+              <span className="shrink-0 text-xs text-[#77716D]">
+                {CATEGORY_BY_SLUG.get(g.category)!.shortName} · {g.readingMinutes} min read
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* Every guide, grouped by category (server-rendered so all links are crawlable) */}
+      {CATEGORIES.map((c) => (
+        <section key={c.slug} aria-labelledby={`cat-${c.slug}`} className="mt-14">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 id={`cat-${c.slug}`} className="text-xl font-bold text-[#292522] sm:text-2xl">{c.name}</h2>
+              <p className="mt-1 max-w-2xl text-sm text-[#77716D]">{c.description}</p>
+            </div>
+            <Link href={`/guides/${c.slug}`} className="text-sm font-semibold text-[#292522] underline decoration-[#E9A9C3] decoration-2 underline-offset-4">
+              View category
             </Link>
-          );
-        })}
-      </div>
+          </div>
+          <div className="grid gap-5 md:grid-cols-2">
+            {guides
+              .filter((g) => g.category === c.slug)
+              .map((g) => (
+                <GuideCard key={g.slug} guide={g} />
+              ))}
+          </div>
+        </section>
+      ))}
 
-      {/* AdSense Unit (Manual Slot or Auto Ad placeholder) */}
       <AdBanner slot={ADSENSE_SLOTS.GUIDES_BOTTOM} />
 
-      {/* Bottom CTA Banner */}
-      <div className="mt-16 rounded-3xl border border-[#F0E8E2] bg-[#FFFDF8] p-8 sm:p-10 text-center space-y-4">
-        <h2 className="text-xl sm:text-2xl font-bold text-[#292522]">
-          Ready to extract your first video transcript?
-        </h2>
-        <p className="text-xs sm:text-sm text-[#77716D] max-w-lg mx-auto leading-relaxed">
-          Paste any YouTube link directly into Transcriptly to test our paragraph organizer, side-by-side translation, and digital book reader.
+      <section className="mt-16 rounded-3xl border border-[#F0E8E2] bg-[#FFFDF8] p-8 text-center sm:p-10">
+        <h2 className="text-xl font-bold text-[#292522] sm:text-2xl">Try it on a video you&apos;re watching</h2>
+        <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-[#77716D]">
+          Paste a YouTube link into Transcriptly to get readable paragraphs, timestamped segments and exports — no account needed.
         </p>
-        <div>
-          <Link
-            href="/"
-            className="inline-flex items-center justify-center rounded-xl bg-[#E9A9C3] px-6 py-2.5 text-xs sm:text-sm font-semibold text-[#292522] hover:bg-[#DE91B1] transition-colors shadow-xs"
-          >
-            Open Transcriptly Extractor
-          </Link>
-        </div>
-      </div>
+        <Link
+          href="/"
+          className="mt-5 inline-flex items-center justify-center rounded-xl bg-[#E9A9C3] px-6 py-2.5 text-sm font-semibold text-[#292522] shadow-xs transition-colors hover:bg-[#DE91B1]"
+        >
+          Open the transcript tool
+        </Link>
+      </section>
     </div>
   );
 }

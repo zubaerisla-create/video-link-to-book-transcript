@@ -3,12 +3,11 @@
 import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { KeyRound, CheckCircle2, AlertCircle, ArrowRight, Lock } from "lucide-react";
 import { resetPasswordApi, ApiError } from "@/lib/api";
 
 function ResetPasswordForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token") || "";
 
@@ -45,11 +44,13 @@ function ResetPasswordForm() {
         confirm_password: confirmPassword,
       });
       setIsSuccess(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof ApiError) {
         setErrorMessage(err.message);
-      } else {
+      } else if (err instanceof Error) {
         setErrorMessage(err.message || "Failed to reset password. The link may have expired.");
+      } else {
+        setErrorMessage("Failed to reset password. The link may have expired.");
       }
     } finally {
       setIsLoading(false);

@@ -1,13 +1,18 @@
 import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
-import Script from "next/script";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { AuthProvider } from "@/lib/auth-context";
 import { AnalyticsTracker } from "@/components/AnalyticsTracker";
+import { AdSenseScript } from "@/components/AdSenseScript";
 
 import { ADSENSE_CLIENT_ID } from "@/lib/adsense";
+
+// The design system (globals.css) expects --font-inter; without it the
+// font-family declaration is invalid and browsers fall back to serif.
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://habd.tech";
 
@@ -49,12 +54,21 @@ export const metadata: Metadata = {
     title: "Transcriptly | YouTube Video URL to Readable Transcript & Digital Books",
     description:
       "Transform messy, fragmented YouTube subtitles into clean, readable paragraphs with multilingual support, translation, and personal library saving.",
+      images: [
+        {
+          url: "/logo.png",
+          width: 281,
+          height: 320,
+          alt: "Transcriptly Logo",
+        },
+      ],
   },
   twitter: {
-    card: "summary_large_image",
+    card: "summary",
     title: "Transcriptly | YouTube Video to Transcript Tool",
     description:
       "Extract clean captions from YouTube videos into readable paragraphs, timestamped SRT, and personal digital books.",
+    images: ["/logo.png"],
   },
   robots: {
     index: true,
@@ -86,17 +100,34 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
-      <head>
-        <Script
-          id="google-adsense-script"
-          async
-          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}`}
-          crossOrigin="anonymous"
-          strategy="afterInteractive"
-        />
-      </head>
+    <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-[#FFFDF8] text-[#292522]">
+        <AdSenseScript />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@graph": [
+                {
+                  "@type": "Organization",
+                  "@id": `${siteUrl}/#organization`,
+                  name: "Transcriptly",
+                  url: siteUrl,
+                  logo: `${siteUrl}/logo.png`,
+                },
+                {
+                  "@type": "WebSite",
+                  "@id": `${siteUrl}/#website`,
+                  name: "Transcriptly",
+                  url: siteUrl,
+                  inLanguage: "en",
+                  publisher: { "@id": `${siteUrl}/#organization` },
+                },
+              ],
+            }).replace(/</g, "\\u003c"),
+          }}
+        />
         <AuthProvider>
           <Suspense fallback={null}>
             <AnalyticsTracker />

@@ -1,13 +1,26 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { HeartHandshake, Lock, Terminal, FileCode, BookOpen, Globe2, ShieldCheck } from "lucide-react";
+import { HeartHandshake, Lock, FileCode, BookOpen, Globe2 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "About Transcriptly | Purpose, Privacy & Technology",
+  title: "About Transcriptly — Purpose, Privacy & Technology",
   description:
     "Learn about the mission, architecture, privacy guarantees, and digital book reader of Transcriptly, a free tool to extract YouTube transcripts into readable text.",
   alternates: {
     canonical: "/about",
+  },
+  openGraph: {
+    type: "website",
+    url: "/about",
+    title: "About Transcriptly — Purpose, Privacy & Technology",
+    description:
+      "Learn about the mission, architecture, privacy guarantees, and digital book reader of Transcriptly, a free tool to extract YouTube transcripts into readable text.",
+  },
+  twitter: {
+    card: "summary",
+    title: "About Transcriptly — Purpose, Privacy & Technology",
+    description:
+      "Learn about the mission, architecture, privacy guarantees, and digital book reader of Transcriptly.",
   },
 };
 
@@ -22,7 +35,7 @@ export default function AboutPage() {
     {
       title: "Privacy-First Architecture",
       description:
-        "For guest visitors, processing is 100% ephemeral in memory: video links and transcripts are discarded when the session ends. For registered members, saved books are private and strictly isolated.",
+        "For guest visitors, standard URL extractions are held only in server memory (in a short-lived cache of up to about 10 minutes that avoids repeated requests to YouTube) and in your browser tab, while Chrome extension or subtitle-upload imports are held in a temporary server staging table for up to 5 minutes until consumed. For registered members, saved books are private to their account. See the Privacy Policy for details, including our first-party usage analytics.",
       icon: Lock,
     },
     {
@@ -62,7 +75,7 @@ export default function AboutPage() {
             When video captions are downloaded in their raw format, each phrase is split across hundreds of short, fragmented chunks such as:
           </p>
           <div className="rounded-xl border border-[#F0E8E2] bg-[#FFFDF8] p-4 font-mono text-xs text-[#292522] space-y-1">
-            <p className="text-[#77716D]">// Raw subtitle segments</p>
+            <p className="text-[#77716D]">{"// Raw subtitle segments"}</p>
             <p>&ldquo;Not because I doubted myself, but&rdquo;</p>
             <p>&ldquo;because I was told that I wasn&apos;t good&rdquo;</p>
             <p>&ldquo;enough. I was told that I didn&apos;t fit in.&rdquo;</p>
@@ -134,7 +147,7 @@ export default function AboutPage() {
             <strong className="text-[#292522]">Aligned Multilingual Translation:</strong> When translation mode is chosen, the engine translates transcripts using existing YouTube caption tracks or modular translation providers, preserving paragraph structure and segment timestamp alignment.
           </p>
           <p>
-            <strong className="text-[#292522]">Ephemeral Processing vs. Saved Library:</strong> Guest requests are processed in memory and never logged to a database. Transcripts are only stored permanently when an authenticated member explicitly clicks &ldquo;Save to My Library&rdquo;.
+            <strong className="text-[#292522]">Ephemeral Processing vs. Saved Library:</strong> Guest URL extractions are processed in memory, and extension or subtitle uploads are held in a temporary 5-minute staging record only until opened. Transcripts are only stored permanently when an authenticated member explicitly clicks &ldquo;Save to My Library&rdquo;.
           </p>
         </div>
       </div>

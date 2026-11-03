@@ -8,7 +8,6 @@ import {
   RotateCcw,
   Sparkles,
   BookOpen,
-  ArrowRight,
   Eye,
   Loader2,
   Trophy,
@@ -55,9 +54,28 @@ export function VocabularyReviewModal({
   };
 
   useEffect(() => {
-    if (isOpen) {
-      fetchCards();
-    }
+    if (!isOpen) return;
+    let active = true;
+    getReviewWordsApi("all", 25)
+      .then((words) => {
+        if (active) {
+          setCards(words);
+          setIsCompleted(false);
+          setCurrentIndex(0);
+          setIsRevealed(false);
+          setLearnedCount(0);
+          setStillLearningCount(0);
+        }
+      })
+      .catch(() => {
+        // Handle silently
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;

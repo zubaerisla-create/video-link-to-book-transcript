@@ -4,17 +4,13 @@ import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   BarChart3,
-  Users,
   Eye,
   Activity,
-  Globe,
-  Smartphone,
   RefreshCw,
   AlertTriangle,
   ArrowLeft,
   TrendingUp,
   TrendingDown,
-  Layers,
 } from "lucide-react";
 import { getAdminOverviewApi } from "@/lib/api";
 import { AdminOverviewResponse } from "@/lib/types";
@@ -35,16 +31,34 @@ export default function AdminAnalyticsPage() {
     try {
       const res = await getAdminOverviewApi(r, f, t);
       setData(res);
-    } catch (err: any) {
-      setError(err.message || "Failed to load visitor analytics.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load visitor analytics.");
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchAnalytics(range, fromDate, toDate);
-  }, [range, fromDate, toDate, fetchAnalytics]);
+    let active = true;
+    getAdminOverviewApi(range, fromDate, toDate)
+      .then((res) => {
+        if (active) {
+          setData(res);
+          setError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (active) {
+          setError(err instanceof Error ? err.message : "Failed to load visitor analytics.");
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [range, fromDate, toDate]);
 
   const handleRangeChange = (newRange: string, f?: string, t?: string) => {
     setRange(newRange);

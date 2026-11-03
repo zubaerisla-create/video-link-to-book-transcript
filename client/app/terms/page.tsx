@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FileText, CheckCircle2, AlertTriangle, ShieldCheck, HelpCircle } from "lucide-react";
+import { AlertTriangle, ShieldCheck } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -8,6 +8,19 @@ export const metadata: Metadata = {
     "Read the Terms of Service governing your use of Transcriptly, including permitted use, intellectual property respect, account responsibilities, and service disclaimers.",
   alternates: {
     canonical: "/terms",
+  },
+  openGraph: {
+    type: "website",
+    url: "/terms",
+    title: "Terms of Service | Transcriptly",
+    description:
+      "Read the Terms of Service governing your use of Transcriptly, including permitted use, intellectual property respect, account responsibilities, and service disclaimers.",
+  },
+  twitter: {
+    card: "summary",
+    title: "Terms of Service | Transcriptly",
+    description:
+      "Read the Terms of Service governing your use of Transcriptly, including permitted use, intellectual property respect, account responsibilities, and service disclaimers.",
   },
 };
 
@@ -151,7 +164,7 @@ export default function TermsOfServicePage() {
         <section className="space-y-3 pt-4 border-t border-[#F0E8E2]">
           <h2 className="text-xl font-bold text-[#292522]">10. Contact Information</h2>
           <p>
-            If you have questions or inquiries regarding these Terms of Service, please reach out via our <Link href="/contact" className="text-[#292522] underline font-semibold hover:text-[#E9A9C3]">Contact Page</Link> or email us at <strong className="text-[#292522]">legal@transcriptly.net</strong>.
+            If you have questions or inquiries regarding these Terms of Service, please reach out via our <Link href="/contact" className="text-[#292522] underline font-semibold hover:text-[#E9A9C3]">Contact Page</Link>.
           </p>
         </section>
       </div>

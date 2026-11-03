@@ -280,8 +280,10 @@ def test_admin_user_activity_and_detail(test_data, db_session):
     assert detail_json["vocabulary_summary"]["total_words"] == 2
     assert len(detail_json["recent_sessions"]) == 1
     assert detail_json["recent_sessions"][0]["book_title"] == book.title
+    assert detail_json["recent_sessions"][0]["reading_progress"] == 66.0
     assert len(detail_json["recent_words"]) == 2
     assert len(detail_json["books"]) == 1
+    assert detail_json["books"][0]["reading_progress"] == 33.0
 
 
 def test_admin_dashboard_reading_and_vocab_kpis(test_data, db_session):

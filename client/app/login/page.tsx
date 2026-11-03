@@ -4,14 +4,23 @@ import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LogIn, AlertCircle, ArrowRight, BookOpen, KeyRound } from "lucide-react";
+import { LogIn, AlertCircle, KeyRound } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError, forgotPasswordApi } from "@/lib/api";
+
+function getSafeRedirectTarget(raw: string | null): string {
+  if (!raw) return "/dashboard";
+  if (raw === "pending_save") return "/?save=true";
+  if (raw.startsWith("/") && !raw.startsWith("//") && !raw.startsWith("/\\")) {
+    return raw;
+  }
+  return "/dashboard";
+}
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTarget = searchParams.get("redirect") || "/dashboard";
+  const redirectTarget = getSafeRedirectTarget(searchParams.get("redirect"));
 
   const { login } = useAuth();
   const [email, setEmail] = useState("");
@@ -38,12 +47,7 @@ function LoginForm() {
     try {
       setIsLoading(true);
       await login(email.trim(), password);
-
-      if (redirectTarget === "pending_save") {
-        router.push("/?save=true");
-      } else {
-        router.push(redirectTarget);
-      }
+      router.push(redirectTarget);
     } catch (err) {
       if (err instanceof ApiError) {
         setErrorMessage(err.message);
@@ -63,8 +67,8 @@ function LoginForm() {
     try {
       await forgotPasswordApi(forgotEmail.trim());
       setForgotSubmitted(true);
-    } catch (err: any) {
-      setForgotError(err.message || "Failed to send reset instructions.");
+    } catch (err: unknown) {
+      setForgotError(err instanceof Error ? err.message : "Failed to send reset instructions.");
     } finally {
       setForgotLoading(false);
     }

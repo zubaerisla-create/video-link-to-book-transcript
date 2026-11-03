@@ -4,10 +4,21 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "How It Works | Transcriptly",
+  title: "How It Works",
   description: "Learn how Transcriptly extracts and formats YouTube captions into readable transcripts.",
   alternates: {
     canonical: "/how-it-works",
+  },
+  openGraph: {
+    type: "website",
+    url: "/how-it-works",
+    title: "How It Works | Transcriptly",
+    description: "Learn how Transcriptly extracts and formats YouTube captions into readable transcripts.",
+  },
+  twitter: {
+    card: "summary",
+    title: "How It Works | Transcriptly",
+    description: "Learn how Transcriptly extracts and formats YouTube captions into readable transcripts.",
   },
 };
 
@@ -109,7 +120,7 @@ export default function HowItWorksPage() {
               <li>Instant retrieval (usually within 1–2 seconds)</li>
               <li>No heavy audio downloading or GPU processing</li>
               <li>Preserves original spoken words and verbatim transcript</li>
-              <li>Free and local without paid cloud API tokens</li>
+              <li>Free, with no paid cloud transcription API</li>
             </ul>
           </div>
 
@@ -121,7 +132,7 @@ export default function HowItWorksPage() {
               </h3>
             </div>
             <p className="text-sm text-[#77716D] leading-relaxed mb-3">
-              Downloads the entire raw audio stream and executes machine learning inference locally or via paid cloud transcription APIs.
+              Downloads the audio stream and runs a speech recognition model on it, which is slower and uses far more computing power.
             </p>
             <ul className="text-xs text-[#77716D] space-y-1.5 list-disc list-inside">
               <li>Requires download of gigabytes of audio data</li>
@@ -140,10 +151,10 @@ export default function HowItWorksPage() {
         </div>
         <div>
           <h2 className="text-base font-semibold text-[#292522] mb-1">
-            Videos Without Captions? Local Speech-to-Text Fallback
+            Videos Without Captions? Speech-to-Text Fallback
           </h2>
           <p className="text-sm text-[#77716D] leading-relaxed">
-            If a video does not have creator-uploaded subtitles or YouTube automated captions enabled, Transcriptly can automatically fall back to local speech recognition using <strong>faster-whisper</strong>. Audio streams are processed locally on your Linux Mint machine, spoken languages (such as Bangla or English) are detected automatically, and temporary files are cleaned up immediately.
+            If a video does not have creator-uploaded subtitles or YouTube automated captions enabled, Transcriptly can fall back to speech recognition using <strong>faster-whisper</strong>, an open-source model that runs on our own server rather than a paid cloud API. The spoken language (such as Bangla or English) is detected automatically, temporary audio files are deleted immediately after processing, and the feature is limited to shorter videos. Expect more errors than with good captions, especially on noisy audio.
           </p>
           <div className="mt-4 flex items-center gap-3">
             <Link

@@ -24,24 +24,39 @@ client = TestClient(app)
 
 
 def test_extract_client_ip_headers():
-    """Verify that client IP is correctly extracted from reverse proxy headers."""
-    # 1. X-Forwarded-For with multiple IPs (client, proxy1, proxy2)
+    """Verify that client IP is safely extracted only from trusted reverse proxies."""
+    # 1. X-Forwarded-For from trusted local proxy: uses the rightmost (proxy-appended) hop,
+    # ignoring any client-spoofed leftmost entries.
     req_forwarded = Request({
         "type": "http",
         "headers": [(b"x-forwarded-for", b"203.0.113.195, 70.41.3.18, 150.172.238.178")],
         "client": ("127.0.0.1", 12345),
     })
-    assert extract_client_ip(req_forwarded) == "203.0.113.195"
+    assert extract_client_ip(req_forwarded) == "150.172.238.178"
 
-    # 2. X-Real-IP
+    # 2. X-Real-IP from trusted local proxy takes precedence
     req_real_ip = Request({
         "type": "http",
-        "headers": [(b"x-real-ip", b"198.51.100.42")],
+        "headers": [
+            (b"x-real-ip", b"198.51.100.42"),
+            (b"x-forwarded-for", b"1.1.1.1, 198.51.100.42"),
+        ],
         "client": ("127.0.0.1", 12345),
     })
     assert extract_client_ip(req_real_ip) == "198.51.100.42"
 
-    # 3. Fallback to client.host if no proxy headers
+    # 3. Direct connection from untrusted peer: ignores spoofed proxy headers
+    req_spoofed_direct = Request({
+        "type": "http",
+        "headers": [
+            (b"x-real-ip", b"1.2.3.4"),
+            (b"x-forwarded-for", b"5.6.7.8"),
+        ],
+        "client": ("192.168.1.50", 12345),
+    })
+    assert extract_client_ip(req_spoofed_direct) == "192.168.1.50"
+
+    # 4. Fallback to client.host if no proxy headers
     req_direct = Request({
         "type": "http",
         "headers": [],

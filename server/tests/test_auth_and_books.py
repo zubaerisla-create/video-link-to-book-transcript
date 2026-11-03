@@ -231,7 +231,15 @@ def test_forgot_and_reset_password(monkeypatch):
     token = reset_link.split("token=")[1]
     assert token
 
-    # 4. Attempt reset with bad token
+    # 4. Attempt to use password reset token as a login session Bearer token -> must be rejected (401)
+    res_reuse_as_session = client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res_reuse_as_session.status_code == 401
+    assert res_reuse_as_session.json()["detail"]["code"] == "INVALID_TOKEN"
+
+    # 5. Attempt reset with bad token
     res_bad_reset = client.post(
         "/api/auth/reset-password",
         json={
@@ -242,7 +250,7 @@ def test_forgot_and_reset_password(monkeypatch):
     )
     assert res_bad_reset.status_code == 400
 
-    # 5. Attempt reset with mismatched passwords
+    # 6. Attempt reset with mismatched passwords
     res_mismatch = client.post(
         "/api/auth/reset-password",
         json={
@@ -253,7 +261,7 @@ def test_forgot_and_reset_password(monkeypatch):
     )
     assert res_mismatch.status_code == 422
 
-    # 6. Complete valid reset
+    # 7. Complete valid reset
     res_valid_reset = client.post(
         "/api/auth/reset-password",
         json={
@@ -264,7 +272,7 @@ def test_forgot_and_reset_password(monkeypatch):
     )
     assert res_valid_reset.status_code == 200
 
-    # 7. Replay attack prevention: attempting to reuse the same token must be rejected
+    # 8. Replay attack prevention: attempting to reuse the same token must be rejected
     res_replay = client.post(
         "/api/auth/reset-password",
         json={
@@ -276,17 +284,133 @@ def test_forgot_and_reset_password(monkeypatch):
     assert res_replay.status_code == 400
     assert res_replay.json()["detail"]["code"] == "RESET_TOKEN_ALREADY_USED"
 
-    # 8. Old password no longer works
+    # 9. Old password no longer works
     res_old_login = client.post(
         "/api/auth/login",
         json={"email": "reset_user@example.com", "password": "OldPassword123!"},
     )
     assert res_old_login.status_code == 401
 
-    # 8. New password logs in successfully
+    # 10. New password logs in successfully
     res_new_login = client.post(
         "/api/auth/login",
         json={"email": "reset_user@example.com", "password": "BrandNewPassword123!"},
     )
     assert res_new_login.status_code == 200
     assert res_new_login.json()["user"]["email"] == "reset_user@example.com"
+
+
+def test_pdf_export_escapes_special_video_url_characters():
+    from server.app.services.pdf_service import generate_book_pdf
+
+    # Attempt XML attribute breakout in video_url
+    crafted_url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ" color="#000000"><img src="http://evil.example/x"'
+    pdf_bytes = generate_book_pdf(
+        title='Test <script>alert(1)</script> & "Quotes"',
+        paragraphs=["First paragraph with <b>tags</b> & ampersands."],
+        video_url=crafted_url,
+        channel_title='Channel "Name" <test>',
+    )
+    assert pdf_bytes.startswith(b"%PDF-")
+
+
+def test_contact_api_security_and_rate_limiting(monkeypatch):
+    from server.app.config import settings
+    from server.app.api.contact import reset_contact_rate_limiter
+
+    reset_contact_rate_limiter()
+    monkeypatch.setattr(settings, "SMTP_USER", "smtp_test@habd.tech")
+    monkeypatch.setattr(settings, "SMTP_PASSWORD", "app-password-test")
+    monkeypatch.setattr(settings, "CONTACT_TO_EMAIL", "inbox@habd.tech")
+
+    sent_messages = []
+
+    def mock_send_contact(to_email, reply_to, subject, text_body, html_body):
+        sent_messages.append({
+            "to_email": to_email,
+            "reply_to": reply_to,
+            "subject": subject,
+            "text_body": text_body,
+            "html_body": html_body,
+        })
+
+    monkeypatch.setattr("server.app.api.contact.send_contact_email", mock_send_contact)
+
+    # 1. Honeypot filled -> silently returns 200 without sending email
+    res_hp = client.post(
+        "/api/contact",
+        json={
+            "name": "Spam Bot",
+            "email": "bot@example.com",
+            "subject": "general",
+            "message": "Buy cheap links right now!",
+            "website": "https://spam.example.com",
+        },
+    )
+    assert res_hp.status_code == 200
+    assert len(sent_messages) == 0
+
+    # 2. Rejects header injection / semicolon / quote characters in email
+    for bad_email in [
+        'attacker@evil.com;victim@target.com',
+        '"attacker"@evil.com',
+        'user(comment)@evil.com',
+        'user@evil.com\r\nBcc: victim@target.com',
+    ]:
+        res_bad = client.post(
+            "/api/contact",
+            json={
+                "name": "Tester",
+                "email": bad_email,
+                "subject": "general",
+                "message": "This is a valid length test message.",
+            },
+        )
+        assert res_bad.status_code == 400
+    assert len(sent_messages) == 0
+
+    # 3. Valid submission sends only to fixed server recipient and escapes HTML
+    res_ok = client.post(
+        "/api/contact",
+        headers={"X-Forwarded-For": "10.0.0.99, 203.0.113.99"},
+        json={
+            "name": "Alice <script>",
+            "email": "alice.test@example.com",
+            "subject": "bug",
+            "message": "Reporting a caption issue on <video> & testing.",
+            "website": "",
+        },
+    )
+    assert res_ok.status_code == 200
+    assert len(sent_messages) == 1
+    assert sent_messages[0]["to_email"] == "inbox@habd.tech"
+    assert sent_messages[0]["reply_to"] == "alice.test@example.com"
+    assert "&lt;script&gt;" in sent_messages[0]["html_body"]
+    assert "<script>" not in sent_messages[0]["html_body"]
+
+    # 4. Rate limit enforced after 5 messages from the same IP (even if client prepends spoofed XFF)
+    for i in range(4):
+        r = client.post(
+            "/api/contact",
+            headers={"X-Forwarded-For": f"10.0.0.{i}, 203.0.113.99"},
+            json={
+                "name": "Alice",
+                "email": "alice.test@example.com",
+                "subject": "general",
+                "message": f"Follow-up test message number {i} with enough chars.",
+            },
+        )
+        assert r.status_code == 200
+
+    res_limited = client.post(
+        "/api/contact",
+        headers={"X-Forwarded-For": "10.0.0.250, 203.0.113.99"},
+        json={
+            "name": "Alice",
+            "email": "alice.test@example.com",
+            "subject": "general",
+            "message": "Sixth message from 203.0.113.99 should be rate limited.",
+        },
+    )
+    assert res_limited.status_code == 429
+    reset_contact_rate_limiter()

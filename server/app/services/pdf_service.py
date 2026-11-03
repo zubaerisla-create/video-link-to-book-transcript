@@ -150,7 +150,12 @@ def generate_book_pdf(
         meta_lines.append(f"<b>Original Language:</b> {html.escape(detected_language_name)}")
     if is_translated and language_name:
         meta_lines.append(f"<b>Translated Language:</b> {html.escape(language_name)}")
-    meta_lines.append(f"<b>Source Video:</b> <a href=\"{video_url}\" color=\"#E9A9C3\">{html.escape(video_url)}</a>")
+    clean_url = (video_url or "").strip()
+    safe_url = html.escape(clean_url, quote=True)
+    if clean_url.startswith(("https://", "http://")):
+        meta_lines.append(f"<b>Source Video:</b> <a href=\"{safe_url}\" color=\"#E9A9C3\">{safe_url}</a>")
+    elif safe_url:
+        meta_lines.append(f"<b>Source Video:</b> {safe_url}")
 
     for line in meta_lines:
         story.append(Paragraph(line, meta_style))

@@ -9,8 +9,6 @@ import {
   Volume2,
   X,
   ExternalLink,
-  BookOpen,
-  Sparkles,
   AlertCircle,
   Loader2,
 } from "lucide-react";
@@ -43,7 +41,6 @@ export function WordTranslationPopup({
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
-  const [savedId, setSavedId] = useState<string | null>(null);
   const popupRef = useRef<HTMLDivElement>(null);
 
   // Theme-aware styles
@@ -91,18 +88,14 @@ export function WordTranslationPopup({
 
   // Fetch translation & definition
   const fetchLookup = async () => {
-    const controller = new AbortController();
     try {
       setIsLoading(true);
       setError(null);
-      const res = await lookupWordApi(word, controller.signal);
+      const res = await lookupWordApi(word);
       setData(res);
-      if (res.is_saved) {
-        setIsSaved(true);
-        setSavedId(res.saved_id || null);
-      }
-    } catch (err: any) {
-      if (err.name === "AbortError") return;
+      setIsSaved(Boolean(res.is_saved));
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
       if (err instanceof ApiError) {
         setError(err.message);
       } else {
@@ -114,7 +107,34 @@ export function WordTranslationPopup({
   };
 
   useEffect(() => {
-    fetchLookup();
+    const controller = new AbortController();
+    let active = true;
+
+    lookupWordApi(word, controller.signal)
+      .then((res) => {
+        if (active) {
+          setData(res);
+          setIsSaved(Boolean(res.is_saved));
+          setError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        if (err instanceof Error && err.name === "AbortError") return;
+        if (err instanceof ApiError) {
+          setError(err.message);
+        } else {
+          setError("Could not retrieve translation for this word.");
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [word]);
 
   // Handle Save Word
@@ -141,11 +161,10 @@ export function WordTranslationPopup({
       };
       const saved = await saveWordApi(payload);
       setIsSaved(true);
-      setSavedId(saved.id);
       if (onWordSaved) {
         onWordSaved(saved);
       }
-    } catch (err: any) {
+    } catch {
       // Keep state clean on error
     } finally {
       setIsSaving(false);
